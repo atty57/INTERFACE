@@ -1,1 +1,41 @@
+# --- Not ours to publish -----------------------------------------------------
+# The take-home brief is interface.ai's material. Working copy only.
 Assignment A — Computer-Use Automation System.md
+
+# --- Secrets (brief §9: "Keep secrets out of the repo") ----------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Playwright / browser --------------------------------------------------
+playwright-report/
+.playwright/
+user-data-dir/
+
+# --- Local tooling -----------------------------------------------------------
+.scratch/
+.claude/settings.local.json
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# --- DELIBERATELY NOT IGNORED ------------------------------------------------
+# evidence/      — mandated by brief §6. Screenshots and trace.zip are graded output.
+# capabilities/  — the committed artifact is what makes replay run without an API key.
+# Do not add *.zip, *.png, or test-results/ here; they would silently eat the evidence.
