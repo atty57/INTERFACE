@@ -12,14 +12,14 @@ byte-wise to prove it.
 
 | Directory | Command | Result |
 |---|---|---|
-| `discovery-*` | `cua record --goal "look up member 12345 and read their savings balance"` | `done` in 6 steps; emitted `capabilities/member.read_savings_balance/1.0.0.json` (also copied here as `artifact.json`) |
+| `discovery-*` | `cua record --goal "look up member 12345 and read their savings balance" --planner openrouter` | A real model-driven run: sign on, search, member detail. `done` in 6 steps, every control resolved at locator tier 1. Emitted `capabilities/member.read_savings_balance/1.0.0.json` (copied here as `artifact.json`). The `decision` records show what the model chose each turn; the `shots/step-N-observed.png` files are exactly what it saw. |
 | `replay-ok-*` | `cua replay --params '{"member_id":"12345"}'` | `Success{savings: 4182.55}`, every step resolved at locator tier 1 |
 | `replay-notfound-*` | `cua replay --params '{"member_id":"99999"}'` | `BusinessOutcome{record_not_found, severity: info}` — an answer, not a crash |
 | `replay-denied-*` | `cua replay --params '{"member_id":"77777"}'` | `BusinessOutcome{permission_denied, severity: warn}` |
 | `replay-recovered-*` | `cua replay --fault timeout` | The session really expires; `re_login` recovers and the step retries → `Success` |
 | `replay-ambiguous-*` | `cua replay --fault ambiguous` | `Failure{ambiguous_state}` — the page matched the success checkpoint *and* `record_not_found`, so the system refused to guess |
 | `replay-escalate-*` | `cua replay --fault dialog --console-port 8765` | Bounded recovery exhausts after its capped 2 attempts, an intervention is raised with the full context bundle, nobody claims it → `Failure{escalation_timeout}` |
-| `replay-tampered-*` | `cua replay --store-root examples/tampered-artifact` | `Failure{policy_denied}` at `s6`, expecting *"human confirmation of an irreversible action"* — the artifact in `examples/tampered-artifact/` is the committed one with a hand-added `Close Account` step relabelled `"safe"`. The gate recomputes reversibility from the control itself and blocks it anyway. The account is never closed. |
+| `replay-tampered-*` | `cua replay --store-root examples/tampered-artifact` | `Failure{escalation_required}` at `s6`, expecting *"human confirmation of an irreversible action"* — a different failure class from an allowlist denial, because they are different facts — the artifact in `examples/tampered-artifact/` is the committed one with a hand-added `Close Account` step relabelled `"safe"`. The gate recomputes reversibility from the control itself and blocks it anyway. The account is never closed. |
 
 Reading a log:
 

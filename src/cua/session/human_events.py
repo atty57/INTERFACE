@@ -46,9 +46,12 @@ class HumanActivityRecorder:
         self.evidence = evidence
         self.events: list[dict[str, Any]] = []
         self._installed = False
+        self._listening = False
 
     def _on_event(self, source: Any, payload: dict[str, Any]) -> None:
         del source
+        if not self._listening:
+            return  # the lease is back with automation; its actions are not human actions
         record = {"holder": "human", **payload}
         self.events.append(record)
         self.session.human_actions.append(record)
@@ -60,6 +63,7 @@ class HumanActivityRecorder:
         self._on_event(None, {"kind": "navigate", "target": frame.url})
 
     def start(self) -> None:
+        self._listening = True
         page = self.session.page
         if not self._installed:
             try:
@@ -76,4 +80,11 @@ class HumanActivityRecorder:
                 continue
 
     def stop(self) -> list[dict[str, Any]]:
+        """Detach. The page listeners cannot be uninstalled, so they are gated instead."""
+        self._listening = False
+        try:
+            self.session.page.remove_listener("framenavigated", self._on_navigation)
+        except Exception:  # noqa: BLE001 - page already closed
+            pass
+        self._installed = False
         return list(self.events)

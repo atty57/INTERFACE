@@ -29,6 +29,10 @@ Rules:
   values, and never type a password you have guessed.
 - Some controls are deliberately out of bounds and the system will refuse them. A refusal
   is expected behaviour, not a reason to retry or to find another route to the same thing.
+- Fill in every field a form needs before you submit it. Submitting a half-filled form is
+  the most common way to get stuck here.
+- Read the screen text each turn. If it reports an error, that is the result of what you
+  just did; correct it rather than repeating the same action.
 - Call done() as soon as the goal's end state is on screen. Call stuck(reason) as soon as
   you believe you cannot reach it."""
 
@@ -87,9 +91,19 @@ def wrap_untrusted(text: str) -> str:
 
 
 def observation(
-    goal: str, digest: ElementDigest, step: int, budget_steps: int, note: str = ""
+    goal: str,
+    digest: ElementDigest,
+    step: int,
+    budget_steps: int,
+    note: str = "",
+    screen_text: str = "",
 ) -> str:
-    """The instruction half is ours; the screen half is quarantined inside the envelope."""
+    """The instruction half is ours; the screen half is quarantined inside the envelope.
+
+    The screen's *text* goes in as well as its controls. Without it the model cannot see an
+    error message — a rejected sign-on looks identical to a screen that never changed, and
+    the run loops until the no-progress detector kills it.
+    """
     instructions = [
         f"GOAL: {goal}",
         f"Step {step} of at most {budget_steps}.",
@@ -97,5 +111,14 @@ def observation(
     ]
     if note:
         instructions.append(f"Result of your last action: {note}")
-    instructions.append("The numbered controls currently on screen:")
-    return "\n".join(instructions) + "\n" + wrap_untrusted(digest.render())
+    instructions.append("The screen's text, then its numbered controls:")
+    body = digest.render()
+    if screen_text:
+        body = f"{_trim(screen_text)}\n\n---\n\n{body}"
+    return "\n".join(instructions) + "\n" + wrap_untrusted(body)
+
+
+def _trim(text: str, limit: int = 1500) -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    joined = "\n".join(lines)
+    return joined if len(joined) <= limit else joined[:limit] + "\n[...truncated]"

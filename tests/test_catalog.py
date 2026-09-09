@@ -4,25 +4,17 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import CAPABILITY
 from cua.artifact.store import ArtifactStore
 from cua.catalog.registry import CapabilityCatalog, CapabilityUnavailable
 from cua.evidence.bus import EvidenceBus
 from cua.orchestrator import execute
 from cua.policy.redact import Redactor
 
-CAPABILITY = "member.read_savings_balance"
-
 
 @pytest.fixture
 def catalog():
     return CapabilityCatalog()
-
-
-@pytest.fixture(autouse=True)
-def _credentials(credentials, monkeypatch):
-    user, password = credentials
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_USERNAME", user)
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_PASSWORD", password)
 
 
 def test_a_capability_resolves_by_name(catalog):

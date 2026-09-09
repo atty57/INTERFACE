@@ -2,31 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from cua.artifact.store import ArtifactStore
-from cua.evidence.bus import EvidenceBus
 from cua.orchestrator import execute
-from cua.policy.redact import Redactor
-
-CAPABILITY = "member.read_savings_balance"
-
-
-@pytest.fixture(scope="session")
-def artifact():
-    return ArtifactStore().load(CAPABILITY).model_copy(update={"approval_state": "approved"})
-
-
-@pytest.fixture
-def evidence(tmp_path):
-    return EvidenceBus("recovery", root=tmp_path, redactor=Redactor())
-
-
-@pytest.fixture(autouse=True)
-def _credentials(credentials, monkeypatch):
-    user, password = credentials
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_USERNAME", user)
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_PASSWORD", password)
 
 
 def run(artifact, session, base_url, evidence, fault=None):

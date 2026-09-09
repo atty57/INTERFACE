@@ -58,8 +58,10 @@ def effective_policy(artifact: CapabilityArtifact, base_url: str) -> Policy:
     """
     deployment_domains = {urlparse(base_url).hostname or "localhost"}
     declared = set(artifact.safety.allowlisted_domains) or deployment_domains
+    # An empty intersection means the artifact authorises nothing here, and deny-by-default
+    # says that is an empty allowlist — not a quiet fallback to the deployment's own host.
     return Policy(
-        allowlisted_domains=sorted(declared & deployment_domains) or sorted(deployment_domains),
+        allowlisted_domains=sorted(declared & deployment_domains),
         allowlisted_routes=list(artifact.safety.allowlisted_routes),
         allowed_actions=list(artifact.safety.allowed_actions),
         irreversible_patterns=DEFAULT_IRREVERSIBLE

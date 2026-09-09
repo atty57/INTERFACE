@@ -20,6 +20,16 @@ class ArtifactNotFound(Exception):
     pass
 
 
+def _semver_key(version: str) -> tuple[tuple[int, ...], str]:
+    head, _, tail = version.partition("-")
+    try:
+        numbers = tuple(int(part) for part in head.split("."))
+    except ValueError:
+        return ((), version)
+    # A pre-release suffix sorts below the plain release, as SemVer requires.
+    return (numbers, "" if not tail else f" {tail}")
+
+
 class ArtifactStore:
     def __init__(self, root: Path | str = DEFAULT_ROOT) -> None:
         self.root = Path(root)
@@ -28,10 +38,11 @@ class ArtifactStore:
         return self.root / capability_id / f"{version}.json"
 
     def versions(self, capability_id: str) -> list[str]:
+        """Oldest first, ordered by SemVer — not lexically, or 1.9.0 would beat 1.10.0."""
         directory = self.root / capability_id
         if not directory.is_dir():
             return []
-        return sorted(p.stem for p in directory.glob("*.json"))
+        return sorted((p.stem for p in directory.glob("*.json")), key=_semver_key)
 
     def capabilities(self) -> list[str]:
         if not self.root.is_dir():

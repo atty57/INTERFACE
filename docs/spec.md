@@ -106,7 +106,7 @@ at once is a hard failure, never a coin flip (§5).
 
   ┌──────────────────────────────────────────────────────────────────────────────────┐
   │ EVIDENCE BUS  (cross-cutting, write-through Redactor)                            │
-  │ JSONL step log · trace.zip · masked screenshots · human_actions[] ·              │
+  │ JSONL step log · masked screenshots · human_actions[] · DOM on failure ·         │
   │ policy decisions (incl. DENIED) · locator tier used   →  /evidence/<run_id>/     │
   └──────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -289,7 +289,7 @@ artifact only ever contains the handle's name.**
   },
 
   "provenance": { "recorded_by": "claude-opus-5", "run_id": "d-20260908-01",
-                  "trace_ref": "evidence/d-20260908-01/trace.zip" }
+                  "trace_ref": "evidence/discovery-20260909-024435" }
 }
 ```
 
@@ -365,7 +365,7 @@ sequenceDiagram
     D->>R: finalize(success_checkpoint)
     R->>R: GENERALIZE — supplied literals → ${params}; credentials → ${secret:};<br/>read values → outputs; /member/12345 → /member/:id
     R-->>O: CapabilityArtifact (approval_state = draft)
-    O->>E: trace.zip + artifact
+    O->>E: evidence bundle + artifact
   else stuck
     D->>O: STUCK(trigger, reason, last_checkpoint) → Flow C
   end
@@ -666,7 +666,7 @@ convincingly than a second capability would, at ~20 lines.
      "look up member 12345 and read their savings balance"                │
  (2) DISCOVERY: genuine Claude-driven run against the live mock, gate on ─┤
      login → search → detail; Close Account seen and DENIED               │
-     evidence: /evidence/discovery-<id>/{steps.jsonl, trace.zip, shots/}  │
+     evidence: /evidence/discovery-<id>/{steps.jsonl, shots/, artifact.json}  │
  (3) ARTIFACT: typed, versioned, parameterized. Credential present as a   ┤
      handle only. draft → approved. COMMITTED to the repo.                │
  (4) REPLAY happy path: {member_id:"12345"} → Success{savings_balance}    │

@@ -74,7 +74,13 @@ same gate, same Recorder, same generalization pass, and `provenance.recorded_by`
 ```bash
 python -m cua record --goal "look up member 12345 and read their savings balance" \
   --target http://127.0.0.1:8000 --planner scripted --headless
-python -m cua approve --capability member.read_savings_balance --artifact-version 1.0.0
+```
+
+A recording lands as `draft`, and replay refuses a draft. There is deliberately no approval
+command: approving is a reviewed edit to one field, and the review is the pull-request diff.
+
+```bash
+sed -i 's/"approval_state": "draft"/"approval_state": "approved"/'   capabilities/member.read_savings_balance/1.0.0.json
 ```
 
 ### 2. Replay it — no key required
@@ -103,6 +109,10 @@ python -m cua replay --capability member.read_savings_balance \
 python -m cua replay --capability member.read_savings_balance \
   --params '{"member_id": "not-a-number"}'
 # → {"kind": "failure", "failure_class": "invalid_input"}
+
+# a hand-edited artifact that relabels Close Account as "safe" is still blocked
+python -m cua replay --capability member.read_savings_balance   --params '{"member_id": "12345"}' --store-root examples/tampered-artifact
+# → {"kind": "failure", "failure_class": "escalation_required"}
 ```
 
 ### 3. Error handling and recovery
@@ -153,7 +163,7 @@ python -m cua digest http://127.0.0.1:8000    # what the model sees instead of p
 ## Tests
 
 ```bash
-python -m pytest             # ~125 tests, real browser, real mock app
+python -m pytest             # ~135 tests, real browser, real mock app
 python -m mypy
 python -m ruff check .
 ```

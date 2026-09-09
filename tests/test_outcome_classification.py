@@ -5,32 +5,10 @@ Conflating the first with the third is the most expensive mistake available here
 
 from __future__ import annotations
 
-import pytest
-
 from cua.artifact.models import Checkpoint
-from cua.artifact.store import ArtifactStore
 from cua.evidence.bus import EvidenceBus
 from cua.orchestrator import execute
 from cua.policy.redact import Redactor
-
-CAPABILITY = "member.read_savings_balance"
-
-
-@pytest.fixture(scope="session")
-def artifact():
-    return ArtifactStore().load(CAPABILITY).model_copy(update={"approval_state": "approved"})
-
-
-@pytest.fixture
-def evidence(tmp_path):
-    return EvidenceBus("classify", root=tmp_path, redactor=Redactor())
-
-
-@pytest.fixture(autouse=True)
-def _credentials(credentials, monkeypatch):
-    user, password = credentials
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_USERNAME", user)
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_PASSWORD", password)
 
 
 def run(artifact, session, base_url, evidence, params=None, **kwargs):
@@ -113,7 +91,7 @@ def test_a_failure_names_the_step_the_expectation_the_observation_and_the_eviden
     assert result.step_id == "s5"
     assert "Member Detail" in result.expected
     assert result.observed
-    assert result.evidence_ref.endswith("classify")
+    assert result.evidence_ref and "shots" not in result.evidence_ref
 
 
 def test_failure_classes_are_distinguishable_by_the_caller(

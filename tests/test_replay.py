@@ -9,37 +9,9 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
+from conftest import CAPABILITY
 from cua.artifact.store import ArtifactStore
-from cua.evidence.bus import EvidenceBus
 from cua.orchestrator import execute, replay, validate_params
-from cua.policy.redact import Redactor
-
-CAPABILITY = "member.read_savings_balance"
-
-
-@pytest.fixture(scope="session")
-def committed_artifact():
-    """The artifact in ``capabilities/`` — recorder output, committed, reviewed as a diff."""
-    return ArtifactStore().load(CAPABILITY)
-
-
-@pytest.fixture
-def approved(committed_artifact):
-    return committed_artifact.model_copy(update={"approval_state": "approved"})
-
-
-@pytest.fixture
-def evidence(tmp_path):
-    return EvidenceBus("replay-test", root=tmp_path, redactor=Redactor())
-
-
-@pytest.fixture(autouse=True)
-def _operator_credentials(credentials, monkeypatch):
-    user, password = credentials
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_USERNAME", user)
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_PASSWORD", password)
 
 
 def run(artifact, session, base_url, evidence, params, **kwargs):
@@ -50,47 +22,49 @@ def run(artifact, session, base_url, evidence, params, **kwargs):
 
 
 def test_replay_returns_success_with_the_declared_typed_output(
-    approved, session, base_url, evidence
+    artifact, session, base_url, evidence
 ):
-    result = run(approved, session, base_url, evidence, {"member_id": "12345"})
+    result = run(artifact, session, base_url, evidence, {"member_id": "12345"})
     assert result.kind == "success"
     assert result.outputs == {"savings": 4182.55}
 
 
 def test_replay_reports_which_targeting_signal_resolved_each_step(
-    approved, session, base_url, evidence
+    artifact, session, base_url, evidence
 ):
-    result = run(approved, session, base_url, evidence, {"member_id": "12345"})
+    result = run(artifact, session, base_url, evidence, {"member_id": "12345"})
     assert result.tiers_used["s1"] == 1  # role + accessible name
     assert set(result.tiers_used) >= {"s1", "s2", "s3", "s4", "s5"}
 
 
 def test_the_same_capability_works_for_a_different_member(
-    approved, session, base_url, evidence
+    artifact, session, base_url, evidence
 ):
     """The generalization pass is what makes this true; a macro would only replay 12345."""
-    result = run(approved, session, base_url, evidence, {"member_id": "54321"})
+    result = run(artifact, session, base_url, evidence, {"member_id": "54321"})
     assert result.kind == "success"
     assert result.outputs == {"savings": 12004.90}
 
 
 def test_replay_runs_with_no_model_api_key_present(
-    approved, session, base_url, evidence, monkeypatch
+    artifact, session, base_url, evidence, monkeypatch
 ):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert run(approved, session, base_url, evidence, {"member_id": "12345"}).kind == "success"
+    """Every model key, not just one: .env is loaded for all commands, replay included."""
+    for key in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENROUTER_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    assert run(artifact, session, base_url, evidence, {"member_id": "12345"}).kind == "success"
 
 
-def test_a_structured_step_log_is_written(approved, session, base_url, evidence):
-    run(approved, session, base_url, evidence, {"member_id": "12345"})
+def test_a_structured_step_log_is_written(artifact, session, base_url, evidence):
+    run(artifact, session, base_url, evidence, {"member_id": "12345"})
     events = {e["event"] for e in evidence.read()}
     assert {"replay_started", "action", "classified", "replay_finished"} <= events
 
 
 def test_the_pii_parameter_is_masked_in_the_evidence_trail(
-    approved, session, base_url, evidence
+    artifact, session, base_url, evidence
 ):
-    run(approved, session, base_url, evidence, {"member_id": "54321"})
+    run(artifact, session, base_url, evidence, {"member_id": "54321"})
     for path in evidence.dir.rglob("*"):
         if path.is_file() and path.suffix in (".jsonl", ".json"):
             assert "54321" not in path.read_text()
@@ -154,19 +128,26 @@ def test_an_unknown_capability_is_refused(tmp_path, base_url):
 # --- I1: no model on the production path -------------------------------------------
 
 
+MODEL_MODULES = ("anthropic", "openai", "cua.discover")
+
+
 def test_no_model_client_is_reachable_from_the_replay_import_graph():
-    """Structural, not procedural. Walk what replay imports and look for a model client."""
+    """Structural, not procedural. Walk what replay imports and look for a model client.
+
+    ``cua.discover`` is in the list because this repo's OpenRouter client is written on
+    ``urllib``: a check that only looked for an SDK package name would not see it.
+    """
     import importlib
     import sys
 
     for name in list(sys.modules):
-        if name.startswith(("anthropic", "openai")):
+        if name.startswith(MODEL_MODULES):
             del sys.modules[name]
 
     for module in ("cua.replay.engine", "cua.replay.detectors", "cua.replay.outcomes"):
         importlib.import_module(module)
 
-    smuggled = [name for name in sys.modules if name.startswith(("anthropic", "openai"))]
+    smuggled = [name for name in sys.modules if name.startswith(MODEL_MODULES)]
     assert smuggled == [], f"a model client is reachable from replay: {smuggled}"
 
 
@@ -177,20 +158,20 @@ def test_the_replay_package_names_no_model_module_in_its_source():
 
     for path in Path(package.__file__).parent.glob("*.py"):
         body = path.read_text(encoding="utf-8")
-        assert "import anthropic" not in body
-        assert "from anthropic" not in body
+        for forbidden in ("import anthropic", "from anthropic", "import openai", "discover"):
+            assert forbidden not in body, f"{path.name} names {forbidden!r}"
 
 
 # --- the command line shell ---------------------------------------------------------
 
 
 def test_the_cli_prints_a_result_a_caller_could_parse(
-    capsys, tmp_path, base_url, approved
+    capsys, tmp_path, base_url, artifact
 ):
     from cua.cli import main
 
     store = ArtifactStore(tmp_path / "capabilities")
-    store.save(approved)
+    store.save(artifact)
     code = main(
         [
             "replay",

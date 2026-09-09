@@ -47,15 +47,6 @@ def _record(args: argparse.Namespace) -> int:
     return 0 if result.outcome.status == "done" else 1
 
 
-def _approve(args: argparse.Namespace) -> int:
-    from .artifact.store import ArtifactStore
-    from .record import approve
-
-    artifact = approve(ArtifactStore(), args.capability, args.artifact_version)
-    emit({"capability_id": artifact.capability_id, "approval_state": artifact.approval_state})
-    return 0
-
-
 def _replay(args: argparse.Namespace) -> int:
     from .escalate.broker import EscalationBroker
     from .escalate.console import serve_in_thread
@@ -146,11 +137,6 @@ def build_parser() -> argparse.ArgumentParser:
     cat = sub.add_parser("catalog", help="list approved capabilities as tool definitions")
     cat.add_argument("--store-root", default="capabilities")
     cat.set_defaults(func=_catalog)
-
-    app = sub.add_parser("approve", help="move a reviewed artifact from draft to approved")
-    app.add_argument("--capability", required=True)
-    app.add_argument("--artifact-version", required=True)
-    app.set_defaults(func=_approve)
 
     return parser
 

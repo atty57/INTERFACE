@@ -37,7 +37,6 @@ class LocatorDescriptor(BaseModel):
 
     role: str | None = None
     accessible_name: str | None = None
-    label: str | None = None
     placeholder: str | None = None
     visible_text: str | None = None
     anchor: Anchor | None = None
@@ -148,6 +147,10 @@ class LocatorUnresolved(Exception):
         self.desc = desc
         self.attempts = attempts
         super().__init__("; ".join(attempts) or "no signals to try")
+
+
+class LocatorAmbiguous(LocatorUnresolved):
+    """A tier matched more than one control. Never resolved by trying a weaker signal."""
 
 
 class SurfaceError(Exception):

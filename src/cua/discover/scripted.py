@@ -33,7 +33,9 @@ class ScriptedPlanner:
     def tokens(self) -> int:
         return 0
 
-    def decide(self, observation: str, digest: ElementDigest) -> ToolCall:
+    def decide(
+        self, observation: str, digest: ElementDigest, screenshot: bytes | None = None
+    ) -> ToolCall:
         def empty(name: str) -> int | None:
             return next(
                 (e.index for e in digest.entries if e.accessible_name == name and not e.value),

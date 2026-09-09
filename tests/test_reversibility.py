@@ -7,34 +7,10 @@ disabled the guardrail, the guardrail would be cosmetic.
 
 from __future__ import annotations
 
-import pytest
-
 from cua.artifact.models import Checkpoint, OnErrorPolicy, Step
-from cua.artifact.store import ArtifactStore
-from cua.evidence.bus import EvidenceBus
 from cua.orchestrator import effective_policy, execute
 from cua.policy.policy import Policy
-from cua.policy.redact import Redactor
 from cua.surface.base import Anchor, LocatorDescriptor
-
-CAPABILITY = "member.read_savings_balance"
-
-
-@pytest.fixture(scope="session")
-def artifact():
-    return ArtifactStore().load(CAPABILITY).model_copy(update={"approval_state": "approved"})
-
-
-@pytest.fixture
-def evidence(tmp_path):
-    return EvidenceBus("reversibility", root=tmp_path, redactor=Redactor())
-
-
-@pytest.fixture(autouse=True)
-def _credentials(credentials, monkeypatch):
-    user, password = credentials
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_USERNAME", user)
-    monkeypatch.setenv("CUA_SECRET_CORE_OPERATOR_PASSWORD", password)
 
 
 def tampered(artifact, declared="safe"):
@@ -88,6 +64,7 @@ def test_a_hand_edited_artifact_that_downgrades_an_irreversible_step_is_still_bl
     result = run(tampered(artifact, declared="safe"), session, base_url, evidence)
     assert result.kind == "failure"
     assert result.step_id == "s6"
+    assert result.failure_class == "escalation_required"
     assert "human confirmation" in result.expected
 
 
@@ -110,6 +87,18 @@ def test_an_irreversible_step_escalates_rather_than_being_silently_denied(
     assert "deny" not in verdicts
 
 
+def test_escalation_and_denial_are_different_failure_classes(
+    artifact, session, base_url, evidence
+):
+    """A caller branches on the class; it must not have to string-match `expected`."""
+    escalated = run(tampered(artifact), session, base_url, evidence)
+    narrowed = artifact.model_copy(deep=True)
+    narrowed.safety.allowlisted_routes = ["/nothing"]
+    denied = run(narrowed, session, base_url, evidence)
+    assert escalated.failure_class == "escalation_required"
+    assert denied.failure_class == "policy_denied"
+
+
 def test_a_safe_step_proceeds_and_its_decision_is_recorded(
     artifact, session, base_url, evidence
 ):
@@ -127,6 +116,13 @@ def test_an_artifact_cannot_add_a_domain_the_deployment_did_not_allow(artifact):
     widened.safety.allowlisted_domains = ["127.0.0.1", "evil.example"]
     policy = effective_policy(widened, "http://127.0.0.1:8000")
     assert policy.allowlisted_domains == ["127.0.0.1"]
+
+
+def test_an_artifact_declaring_only_other_domains_authorises_nothing_here(artifact):
+    """Deny by default: an empty intersection is an empty allowlist, not a fallback."""
+    elsewhere = artifact.model_copy(deep=True)
+    elsewhere.safety.allowlisted_domains = ["bank.example"]
+    assert effective_policy(elsewhere, "http://127.0.0.1:8000").allowlisted_domains == []
 
 
 def test_an_artifact_cannot_switch_the_gate_out_of_block_irreversible(artifact):

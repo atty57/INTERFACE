@@ -21,6 +21,7 @@ from .base import (
     Effect,
     ElementDigest,
     Located,
+    LocatorAmbiguous,
     LocatorDescriptor,
     LocatorUnresolved,
     SurfaceError,
@@ -231,11 +232,18 @@ class WebPerception:
             if len(matches) == 1:
                 return Located(tier=tier, handle=self.handle_for(matches[0]))
             attempts.append(f"tier {tier}: {len(matches)} matches")
+            if len(matches) > 1:
+                # Fail closed. Falling through to a weaker signal here would silently
+                # resolve an ambiguous strong signal by a different route, which is the
+                # "never take the first match" rule with extra steps.
+                raise LocatorAmbiguous(desc, attempts)
         if desc.structural:
             handles = self.frame_at(desc.frame_path).query_selector_all(desc.structural)
             if len(handles) == 1:
                 return Located(tier=5, handle=handles[0])
             attempts.append(f"tier 5: {len(handles)} matches")
+            if len(handles) > 1:
+                raise LocatorAmbiguous(desc, attempts)
         else:
             attempts.append("tier 5: no signal recorded")
         raise LocatorUnresolved(desc, attempts)
@@ -284,7 +292,7 @@ def _tiers(
 
     return [
         match("accessible_name", desc.accessible_name),
-        match("placeholder", desc.label or desc.placeholder),
+        match("placeholder", desc.placeholder),
         match("visible_text", desc.visible_text),
         match("near", desc.anchor.stable_text if desc.anchor else None),
     ]
@@ -393,7 +401,10 @@ class WebSurface(WebPerception):
             elif action.kind == "extract":
                 assert action.target is not None
                 return Effect(
-                    action=action, tier=4, extracted=self.extract(action.target), url=self.page.url
+                    action=action,
+                    tier=None,  # the anchor resolver is not the ladder; claiming a tier
+                    extracted=self.extract(action.target),  # would poison drift telemetry
+                    url=self.page.url,
                 )
         except PlaywrightError as failure:
             raise SurfaceError(f"{action.kind} failed: {failure}") from failure

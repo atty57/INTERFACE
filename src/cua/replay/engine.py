@@ -1,6 +1,7 @@
 """The production execution path. No model is reachable from this module — that is I1.
 
-``tests/test_replay_has_no_llm.py`` walks this module's import graph and fails if a model
+``test_no_model_client_is_reachable_from_the_replay_import_graph`` in
+``tests/test_replay.py`` walks this module's import graph and fails if a model
 client appears anywhere beneath it, which turns "no LLM on the production path" from a
 claim into something continuous integration enforces.
 """
@@ -15,9 +16,9 @@ from urllib.parse import urljoin
 from ..artifact.models import CapabilityArtifact, Checkpoint, Step
 from ..evidence.bus import EvidenceBus
 from ..policy.gate import ConfirmationRequired, PolicyDenied
-from ..surface.base import Action, LocatorUnresolved, SurfaceError
+from ..surface.base import Action, LocatorAmbiguous, LocatorUnresolved, SurfaceError
 from ..surface.web import WebSurface
-from .detectors import Candidate, RaceOutcome, bind, race, summarize
+from .detectors import Candidate, RaceOutcome, bind, describe_step, race, summarize
 from .outcomes import BusinessOutcome, Failure, RunResult, Success
 from .recovery import BACKOFF_SECONDS, DISMISS_CONTROL, REPEAT_ACTION_AFTER, RecoveryLedger
 
@@ -118,14 +119,8 @@ class ReplayEngine:
                     continue
                 return ending
             perform = recovered
-        return Failure(
-            failure_class="checkpoint_missed",
-            step_id=step.id,
-            expected=self._expected(step, index),
-            observed="recovery rounds exhausted",
-            run_id=self.run_id,
-            evidence_ref=self.evidence.ref,
-            tiers_used=self.tiers,
+        return self._fail(
+            "checkpoint_missed", step, self._expected(step, index), "recovery rounds exhausted"
         )
 
     def _act(self, step: Step) -> RunResult | None:
@@ -133,53 +128,41 @@ class ReplayEngine:
         if action is None:
             return None
         try:
-            effect = self._act_once(action)
+            effect = self.surface.act(action)
         except PolicyDenied as denied:
             self.evidence.log("policy_denied", step=step.id, reason=str(denied))
-            return Failure(
-                failure_class="policy_denied",
-                step_id=step.id,
-                expected="an allowlisted action",
-                observed=str(denied),
-                run_id=self.run_id,
-                evidence_ref=self.evidence.ref,
-                tiers_used=self.tiers,
-            )
+            return self._fail("policy_denied", step, "an allowlisted action", str(denied))
         except ConfirmationRequired as confirm:
             return self._escalate_irreversible(step, str(confirm))
+        except LocatorAmbiguous as ambiguous:
+            return self._fail("ambiguous_state", step, describe_step(step), str(ambiguous))
         except LocatorUnresolved as unresolved:
             # One re-snapshot and backoff, then the ladder once more — no third chance.
             self.evidence.log("locator_retry", step=step.id, attempts=unresolved.attempts)
             time.sleep(BACKOFF_SECONDS[0])
             try:
-                effect = self._act_once(action)
+                effect = self.surface.act(action)
+            except LocatorAmbiguous as ambiguous:
+                return self._fail("ambiguous_state", step, describe_step(step), str(ambiguous))
             except (LocatorUnresolved, SurfaceError) as final:
-                return Failure(
-                    failure_class="locator_unresolved",
-                    step_id=step.id,
-                    expected=_describe(step),
-                    observed=str(final),
-                    run_id=self.run_id,
-                    evidence_ref=self.evidence.ref,
-                    tiers_used=self.tiers,
-                )
+                return self._fail("locator_unresolved", step, describe_step(step), str(final))
         except SurfaceError as broken:
-            return Failure(
-                failure_class="surface_error",
-                step_id=step.id,
-                expected=_describe(step),
-                observed=str(broken),
-                run_id=self.run_id,
-                evidence_ref=self.evidence.ref,
-                tiers_used=self.tiers,
-            )
+            return self._fail("surface_error", step, describe_step(step), str(broken))
         if effect.tier is not None:
             self.tiers[step.id] = effect.tier
             self._warn_on_tier_drift(step, effect.tier)
         return None
 
-    def _act_once(self, action: Action) -> Any:
-        return self.surface.act(action)
+    def _fail(self, failure_class: Any, step: Step, expected: str, observed: str) -> Failure:
+        return Failure(
+            failure_class=failure_class,
+            step_id=step.id,
+            expected=expected,
+            observed=observed,
+            run_id=self.run_id,
+            evidence_ref=self.evidence.ref,
+            tiers_used=self.tiers,
+        )
 
     def _action_for(self, step: Step) -> Action | None:
         if step.action in ("assert", "wait"):
@@ -330,16 +313,8 @@ class ReplayEngine:
                 }.get(verdict, failure_class)
             else:
                 escalation_id = resolution
-        return Failure(
-            failure_class=failure_class,
-            step_id=step.id,
-            expected=expected,
-            observed=observed,
-            run_id=self.run_id,
-            evidence_ref=self.evidence.ref,
-            escalation_id=escalation_id,
-            tiers_used=self.tiers,
-        )
+        failure = self._fail(failure_class, step, expected, observed)
+        return failure.model_copy(update={"escalation_id": escalation_id})
 
     def _escalate_irreversible(self, step: Step, reason: str) -> RunResult:
         """Escalating and denying are different code paths, because they mean different things."""
@@ -347,16 +322,10 @@ class ReplayEngine:
         escalation_id = None
         if self.escalator is not None:
             escalation_id = self.escalator(self.artifact, step, "human confirmation", reason)
-        return Failure(
-            failure_class="policy_denied",
-            step_id=step.id,
-            expected="human confirmation of an irreversible action",
-            observed=reason,
-            run_id=self.run_id,
-            evidence_ref=self.evidence.ref,
-            escalation_id=escalation_id,
-            tiers_used=self.tiers,
+        failure = self._fail(
+            "escalation_required", step, "human confirmation of an irreversible action", reason
         )
+        return failure.model_copy(update={"escalation_id": escalation_id})
 
     # --- outputs ---------------------------------------------------------------------
 
@@ -368,16 +337,6 @@ class ReplayEngine:
                 continue
             values[output.name] = _transform(raw, output.transform)
         return values
-
-
-class _ResumeRequested(Exception):
-    """Raised when an operator hands control back — handled by the orchestrator."""
-
-
-def _describe(step: Step) -> str:
-    if step.target is None:
-        return f"{step.action} {step.value}"
-    return f"{step.action} on {step.target.role} '{step.target.accessible_name}'"
 
 
 def _transform(raw: str, transform: str) -> object:

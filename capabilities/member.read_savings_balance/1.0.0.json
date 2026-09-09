@@ -82,7 +82,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
-      "recorded_tier": 0,
+      "recorded_tier": 1,
       "on_error": {
         "business_outcomes": [],
         "recover": [],
@@ -111,7 +111,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
-      "recorded_tier": 0,
+      "recorded_tier": 1,
       "on_error": {
         "business_outcomes": [],
         "recover": [],
@@ -137,7 +137,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
-      "recorded_tier": 0,
+      "recorded_tier": 1,
       "on_error": {
         "business_outcomes": [
           "record_not_found",
@@ -176,7 +176,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
-      "recorded_tier": 0,
+      "recorded_tier": 1,
       "on_error": {
         "business_outcomes": [],
         "recover": [],
@@ -203,7 +203,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
-      "recorded_tier": 0,
+      "recorded_tier": 1,
       "on_error": {
         "business_outcomes": [
           "record_not_found",
@@ -318,10 +318,10 @@
     "confirm_mode": "block_irreversible"
   },
   "provenance": {
-    "recorded_by": "scripted-planner",
-    "run_id": "discovery-20260909-010541",
-    "trace_ref": "evidence/discovery-20260909-010541",
-    "recorded_at": "2026-09-09T01:06:04.358957+00:00",
+    "recorded_by": "openrouter:anthropic/claude-sonnet-4.5",
+    "run_id": "discovery-20260909-030513",
+    "trace_ref": "evidence/discovery-20260909-030513",
+    "recorded_at": "2026-09-09T03:08:17.543574+00:00",
     "goal": "look up member 12345 and read their savings balance"
   }
 }

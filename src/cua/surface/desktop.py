@@ -4,8 +4,8 @@
 Windows UIA, macOS AX and AT-SPI all expose role, name, and containment, so they would
 produce the same ``ElementDigest`` shape. Adding desktop means implementing these three
 methods — not touching the artifact schema, the replay engine, the policy gate, or the
-escalation model. ``test_surface_protocol.py`` asserts this class satisfies ``Surface``,
-so that claim is checked rather than written down.
+escalation model. ``test_the_desktop_stub_satisfies_the_surface_interface`` in ``tests/test_digest.py``
+asserts this class satisfies ``Surface``, so the claim is checked rather than written down.
 """
 
 from .base import Action, Effect, ElementDigest, Located, LocatorDescriptor

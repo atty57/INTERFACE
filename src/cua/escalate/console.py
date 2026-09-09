@@ -1,6 +1,6 @@
-# STUB — the surface only. Not implemented: authentication, multi-operator queues,
-# co-browsing. The mechanism beneath it (lease transitions, event capture, re-anchor) is
-# real, and a production console plugs into it unchanged. See REPORT §7.
+# STUB — design seam only. Not implemented: authentication, multi-operator queues,
+# co-browsing. See REPORT §7. The mechanism beneath it — lease transitions, event capture,
+# re-anchor — is real, and a production console plugs into it unchanged.
 """A minimal operator console: open interventions, and claim / done / abort.
 
 It runs in the replaying process, because the lease it moves belongs to that process's

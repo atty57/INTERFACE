@@ -17,6 +17,7 @@ FailureClass = Literal[
     "capability_unavailable",
     "invalid_input",
     "policy_denied",
+    "escalation_required",
     "locator_unresolved",
     "checkpoint_missed",
     "ambiguous_state",

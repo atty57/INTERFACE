@@ -78,6 +78,27 @@ def test_no_secret_value_appears_anywhere_beneath_the_evidence_tree(
             assert password.encode() not in path.read_bytes(), path
 
 
+def test_no_secret_value_appears_anywhere_beneath_the_artifact_tree(credentials):
+    """The committed capability is shipped in the repo, so it gets the same recursive grep."""
+    from pathlib import Path
+
+    user, password = credentials
+    for path in Path("capabilities").rglob("*"):
+        if path.is_file():
+            body = path.read_bytes()
+            assert password.encode() not in body, path
+            assert user.encode() not in body, path
+
+
+def test_the_artifact_names_the_handle_and_carries_no_credential():
+    from cua.artifact.store import ArtifactStore
+
+    artifact = ArtifactStore().load("member.read_savings_balance")
+    assert artifact.requires_secrets == ["core_operator"]
+    values = [step.value for step in artifact.steps]
+    assert "${secret:core_operator.password}" in values
+
+
 def test_the_log_records_the_handle_name_rather_than_the_value(surface, base_url, evidence):
     _sign_on(surface, base_url)
     body = evidence.log_path.read_text()

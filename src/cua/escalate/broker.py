@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from ..artifact.models import CapabilityArtifact, Step
 from ..evidence.bus import EvidenceBus
-from ..replay.detectors import evaluate
+from ..replay.detectors import describe_step, evaluate
 
 # What the escalator hands back to the engine: the step is done, or it should be repeated.
 from ..replay.engine import ABANDONED, ABORTED, RESUME, RETRY
@@ -114,7 +114,7 @@ class EscalationBroker:
             observed=observed,
             last_good_checkpoint=_last_good(artifact, step),
             screenshot_ref=str(shot).replace("\\", "/") if shot else "",
-            proposed_action=_describe(step),
+            proposed_action=describe_step(step),
             params_summary={k: "(redacted)" for k in self._params},
         )
         self.queue.append(request)
@@ -201,9 +201,12 @@ class EscalationBroker:
             return None
         steps = self._artifact.steps
         index = next((i for i, s in enumerate(steps) if s.id == self._step.id), 0)
-        if self._step.expected_state and evaluate(
-            self._surface, self._step.expected_state, self._params, self._step.target
-        ):
+        # The last step's expectation is the capability's success checkpoint, so a handback
+        # on the final step can re-anchor like any other.
+        expected = self._step.expected_state
+        if index == len(steps) - 1:
+            expected = expected or self._artifact.success_checkpoint
+        if expected and evaluate(self._surface, expected, self._params, self._step.target):
             return RESUME
         previous = steps[index - 1] if index else None
         if previous and previous.expected_state and evaluate(
@@ -219,9 +222,3 @@ def _last_good(artifact: CapabilityArtifact, step: Step) -> str:
         if earlier.expected_state:
             return f"{earlier.id}: {earlier.expected_state.kind} '{earlier.expected_state.matcher}'"
     return "none reached"
-
-
-def _describe(step: Step) -> str:
-    if step.target is None:
-        return f"{step.action} {step.value}"
-    return f"{step.action} on {step.target.role} '{step.target.accessible_name}'"

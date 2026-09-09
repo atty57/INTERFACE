@@ -103,9 +103,15 @@ that.
 **Locating.** The frame path is walked first — framesets are the number-one legacy failure
 mode. Then a five-tier ladder: role + accessible name → label/placeholder → visible text →
 anchor-relative (stable label text plus a row/adjacency relation) → scoped structural
-selector. The first tier resolving to **exactly one** element wins; more than one is an
-error, never "take the first". The tier that resolved is returned in `tiers_used` and
-compared against `recorded_tier`: resolving *below* the recorded tier warns and logs but
+selector. The first tier resolving to **exactly one** element wins. More than one is an
+error, never "take the first" — and never a fall-through to a weaker tier either, because
+resolving an ambiguous strong signal by another route is the same mistake with extra steps.
+It surfaces as `ambiguous_state`, distinct from `locator_unresolved`.
+
+The tier that resolved is returned in `tiers_used` and
+compared against `recorded_tier` — which the Recorder captures by resolving the descriptor
+it is about to write, before acting, so it is a real ladder result rather than an artefact
+of how discovery targeted the control. Resolving *below* the recorded tier warns and logs but
 never fails, and a capability sliding from tier 1 to tier 5 over weeks is a capability about
 to break. That is the UI-drift signal, and per-tenant it is also §4's fork signal.
 
@@ -128,9 +134,9 @@ success.
 Success         { outputs, run_id, evidence_ref, duration_ms, tiers_used }
 BusinessOutcome { name, severity, message, partial_outputs, step_id, … }
 Failure         { class, step_id, expected, observed, evidence_ref, escalation_id? }
-class ∈ capability_unavailable | invalid_input | policy_denied | locator_unresolved |
-        checkpoint_missed | ambiguous_state | session_lost | surface_error |
-        operator_aborted | escalation_timeout
+class ∈ capability_unavailable | invalid_input | policy_denied | escalation_required |
+        locator_unresolved | checkpoint_missed | ambiguous_state | session_lost |
+        surface_error | operator_aborted | escalation_timeout
 ```
 
 "No such member" is an *answer* the calling agent must act on, returned as data with a
@@ -168,6 +174,16 @@ is what opens a fork review. A fork is a recorded decision, never automatic, bec
 alternative to reuse is re-recording twenty apps across hundreds of institutions.
 
 ## 5. Escalation & handoff
+
+The no-progress detector earned its place during development rather than in theory: the
+first real run typed the user ID, clicked Sign On without the password, and looped. It fired
+correctly — and the diagnosis exposed two genuine defects it was masking. The model was
+being shown the page's *controls* but not its *text*, so a rejected sign-on was
+indistinguishable from a screen that never changed; and the loop took only the first of
+several parallel tool calls while leaving the rest unanswered, so the model believed it had
+typed a password it never typed. Both are fixed — screen text now enters the same
+untrusted-data envelope as the digest, and every tool call is answered, the extras with an
+explicit "not executed".
 
 **Detecting stuck** uses three independent triggers, in order of preference: an explicit
 `stuck(reason)` tool the model may call (cheapest, best context); a no-progress detector
@@ -213,8 +229,10 @@ injected text to talk to.
 - **Allowlist** over domains, route globs and action types. A relative navigation target is
   resolved to an absolute URL *before* the domain check, so it cannot slip past.
 - **Reversibility**: safe proceeds, risky proceeds flagged and logged, irreversible
-  **escalates** — deliberately a different outcome and a different code path from denial,
-  because "a human must confirm this" and "this is out of bounds" are different facts.
+  **escalates** — deliberately a different outcome, a different code path *and* a different
+  failure class (`escalation_required`, not `policy_denied`) from denial, because "a human
+  must confirm this" and "this is out of bounds" are different facts and a caller has to be
+  able to branch on which one it got.
 - **The gate does not trust the artifact.** Reversibility is recomputed from policy at
   replay time from the control's own label and route, and the *stricter* of that and the
   artifact's claim wins. A hand-edited artifact that appends a `Close Account` step marked
@@ -247,7 +265,7 @@ defence here is structural, not a claim that the discovery run is immune.
 | **Overlay resolution code** | §7 explicitly does not reward building scaling infrastructure | The overlay format and its four permitted operations, fully specified |
 | **Coordinate / vision fallback** | The digest is lossless for recording; the fallback is speculative until a run fails without it | The screenshot is still in the model's context for layout reasoning |
 | **Real operator console** | 3.6 permits mocking it | Real lease, real CDP-attached session, real event capture, real re-anchor; one HTML page |
-| **Approval workflow** | Stretch goal | `approval_state` enforced at replay; `cua approve` and a PR diff, no UI |
+| **Approval workflow** | Stretch goal | `approval_state` enforced at replay; approving is a one-field edit reviewed as a PR diff — there is deliberately no command for it |
 | **Multi-run stability scoring** | Stretch goal, not chosen | — |
 
 **One honest gap.** A happy-path discovery run cannot see the screens it never visited, so

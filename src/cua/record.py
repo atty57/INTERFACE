@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
-from .artifact.models import CapabilityArtifact, Provenance
+from .artifact.models import Provenance
 from .artifact.store import ArtifactStore
 from .discover.loop import MODEL, ClaudePlanner, DiscoveryEngine, DiscoveryOutcome, Planner
 from .discover.openrouter import DEFAULT_MODEL as OPENROUTER_MODEL
@@ -114,11 +114,3 @@ def _recorded_by(kind: str, model: str) -> str:
     if kind == "openrouter":
         return f"openrouter:{model or OPENROUTER_MODEL}"
     return model or MODEL
-
-
-def approve(store: ArtifactStore, capability_id: str, version: str) -> CapabilityArtifact:
-    """Move a reviewed artifact from draft to approved. There is no workflow, by design."""
-    artifact = store.load(capability_id, version)
-    approved = artifact.model_copy(update={"approval_state": "approved"})
-    store.save(approved)
-    return approved

@@ -15,8 +15,8 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
-from ..artifact.models import Checkpoint
-from ..surface.base import LocatorDescriptor, LocatorUnresolved, SurfaceError
+from ..artifact.models import Checkpoint, Step
+from ..surface.base import LocatorDescriptor
 from ..surface.web import WebPerception
 
 Role = Literal["checkpoint", "business", "recoverable"]
@@ -94,7 +94,7 @@ def _element_state(
     try:
         handle = surface.locate(target).handle
         value = handle.evaluate("el => (el.value === undefined ? '' : String(el.value))")
-    except (LocatorUnresolved, SurfaceError, Exception):  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - an unresolvable target simply means "not in this state"
         return False
     if matcher == "value.length>0":
         return bool(value)
@@ -133,6 +133,13 @@ def race(
         if time.monotonic() >= deadline:
             return RaceOutcome(kind="timeout", observed=summarize(surface.page_text()))
         time.sleep(poll_ms / 1000)
+
+
+def describe_step(step: Step) -> str:
+    """One line naming what a step tries to do — for failures and for the operator bundle."""
+    if step.target is None:
+        return f"{step.action} {step.value}"
+    return f"{step.action} on {step.target.role} '{step.target.accessible_name}'"
 
 
 def summarize(screen: str) -> str:
