@@ -218,6 +218,31 @@
         ],
         "otherwise": "escalate"
       }
+    },
+    {
+      "id": "s6",
+      "action": "click",
+      "target": {
+        "role": "link",
+        "visible_text": "Close Account",
+        "anchor": {
+          "stable_text": "Back to Search",
+          "relation": "following"
+        },
+        "frame_path": []
+      },
+      "value": "",
+      "expected_state": {
+        "kind": "text",
+        "matcher": "has been queued",
+        "timeout_ms": 4000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [],
+        "recover": [],
+        "otherwise": "escalate"
+      }
     }
   ],
   "known_business_outcomes": [

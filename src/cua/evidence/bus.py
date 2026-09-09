@@ -21,13 +21,14 @@ class EvidenceBus:
     ) -> None:
         self.run_id = run_id
         self.dir = Path(root) / run_id
-        self.dir.mkdir(parents=True, exist_ok=True)
         self.log_path = self.dir / "steps.jsonl"
         self.redactor = redactor or Redactor()
 
     def log(self, event: str, **fields: Any) -> None:
         record = self.redactor({"ts": time.time(), "event": event, **fields})
         try:
+            # Created on first write, so a run that writes nothing leaves no directory.
+            self.dir.mkdir(parents=True, exist_ok=True)
             with self.log_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(record, default=str) + "\n")
         except OSError:  # pragma: no cover - evidence degrades, never blocks

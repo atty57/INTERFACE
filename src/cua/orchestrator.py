@@ -85,6 +85,9 @@ def execute(
     evidence.redactor.values.update(secrets.values())
     surface = WebSurface(session.page, PolicyGate(policy, secrets), session.lease, evidence=evidence)
 
+    if escalation is not None:
+        escalation.bind_evidence(evidence)
+
     if fault:
         # Arms the mock application's fault injection. Gated and logged like any navigation.
         from .surface.base import Action
@@ -113,8 +116,10 @@ def replay(
     headless: bool | None = None,
     evidence_root: Path | str = "evidence",
     escalation: EscalationBroker | None = None,
+    label: str = "",
 ) -> RunResult:
-    run_id = f"replay-{dt.datetime.now(dt.UTC).strftime('%Y%m%d-%H%M%S')}"
+    stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%d-%H%M%S")
+    run_id = f"replay-{label}-{stamp}" if label else f"replay-{stamp}"
     evidence = EvidenceBus(run_id, root=evidence_root, redactor=Redactor())
 
     try:

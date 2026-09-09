@@ -51,6 +51,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
+      "recorded_tier": null,
       "on_error": {
         "business_outcomes": [
           "record_not_found",
@@ -91,6 +92,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
+      "recorded_tier": 0,
       "on_error": {
         "business_outcomes": [],
         "recover": [],
@@ -122,6 +124,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
+      "recorded_tier": 0,
       "on_error": {
         "business_outcomes": [],
         "recover": [],
@@ -150,6 +153,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
+      "recorded_tier": 0,
       "on_error": {
         "business_outcomes": [
           "record_not_found",
@@ -191,6 +195,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
+      "recorded_tier": 0,
       "on_error": {
         "business_outcomes": [],
         "recover": [],
@@ -220,6 +225,7 @@
         "timeout_ms": 8000
       },
       "reversibility": "safe",
+      "recorded_tier": 0,
       "on_error": {
         "business_outcomes": [
           "record_not_found",
@@ -335,9 +341,9 @@
   },
   "provenance": {
     "recorded_by": "scripted-planner",
-    "run_id": "discovery-20260908-201452",
-    "trace_ref": "evidence/discovery-20260908-201452",
-    "recorded_at": "2026-09-09T00:15:14.147445+00:00",
+    "run_id": "discovery-20260909-010541",
+    "trace_ref": "evidence/discovery-20260909-010541",
+    "recorded_at": "2026-09-09T01:06:04.358957+00:00",
     "goal": "look up member 12345 and read their savings balance"
   }
 }

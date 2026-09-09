@@ -59,16 +59,14 @@ def _approve(args: argparse.Namespace) -> int:
 def _replay(args: argparse.Namespace) -> int:
     from .escalate.broker import EscalationBroker
     from .escalate.console import serve_in_thread
-    from .evidence.bus import EvidenceBus
     from .orchestrator import replay
 
     params = json.loads(args.params)
     escalation = None
     if args.console_port:
+        # The run's own evidence bus is bound to it once the run starts.
         escalation = EscalationBroker(
-            EvidenceBus("console", root=args.evidence_root),
-            wait_timeout_s=args.escalation_timeout,
-            keep_open=True,
+            wait_timeout_s=args.escalation_timeout, keep_open=True
         )
         serve_in_thread(escalation, args.console_port)
         print(f"operator console: http://127.0.0.1:{args.console_port}/operator", file=sys.stderr)
@@ -83,6 +81,7 @@ def _replay(args: argparse.Namespace) -> int:
         headless=not args.headful,
         evidence_root=args.evidence_root,
         escalation=escalation,
+        label=args.label,
     )
     emit(result.model_dump())
     return 0 if result.kind != "failure" else 2
@@ -137,6 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--base-url", default=None, help="override the artifact's recorded host")
     rep.add_argument("--fault", default=None, help="arm a mock-app fault; see docs/faults.md")
     rep.add_argument("--evidence-root", default="evidence")
+    rep.add_argument("--label", default="", help="name this run's evidence directory")
     rep.add_argument("--store-root", default="capabilities")
     rep.add_argument("--console-port", type=int, default=0, help="serve the operator console")
     rep.add_argument("--escalation-timeout", type=float, default=120.0)

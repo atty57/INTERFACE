@@ -57,12 +57,12 @@ Operator = Callable[[InterventionRequest, Any, Any], str]
 class EscalationBroker:
     def __init__(
         self,
-        evidence: EvidenceBus,
+        evidence: EvidenceBus | None = None,
         operator: Operator | None = None,
         wait_timeout_s: float = 120.0,
         keep_open: bool = False,
     ) -> None:
-        self.evidence = evidence
+        self.evidence = evidence or EvidenceBus("escalation", root="evidence")
         self.operator = operator
         self.wait_timeout_s = wait_timeout_s
         self.keep_open = keep_open
@@ -73,6 +73,10 @@ class EscalationBroker:
         self._step: Step | None = None
         self._params: dict[str, Any] = {}
         self._recorder: HumanActivityRecorder | None = None
+
+    def bind_evidence(self, evidence: EvidenceBus) -> None:
+        """Write into the run's own evidence directory, not a directory of our own."""
+        self.evidence = evidence
 
     # --- the hook the replay engine calls -------------------------------------------
 
