@@ -89,7 +89,7 @@ def generalize(
     return Generalized(
         trace=rewritten,
         input_params=list(params.values()),
-        outputs=_outputs(goal, final_values),
+        outputs=_outputs(goal, final_values, literal_to_param),
         requires_secrets=secrets,
     )
 
@@ -130,13 +130,18 @@ def _rewrite_checkpoint(checkpoint: Checkpoint, literal_to_param: dict[str, str]
     return checkpoint.model_copy(update={"matcher": matcher})
 
 
-def _outputs(goal: str, final_values: dict[str, str]) -> list[Output]:
+def _outputs(
+    goal: str, final_values: dict[str, str], literals: dict[str, str] | None = None
+) -> list[Output]:
     """Values read from the final screen become typed outputs — the ones the goal asked for."""
     words = set(re.findall(r"[a-z]+", goal.casefold()))
+    supplied = set(literals or {})
     outputs = []
     for label, value in final_values.items():
         if not words & set(re.findall(r"[a-z]+", label.casefold())):
             continue
+        if value.strip() in supplied:
+            continue  # the caller supplied this; echoing it back is not an output
         money = bool(CURRENCY.match(value.strip()))
         outputs.append(
             Output(

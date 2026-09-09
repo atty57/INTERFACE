@@ -189,6 +189,7 @@ def _to_step(step_id: str, recorded: RecordedAction) -> Step:
         value=recorded.action.value or recorded.action.url,
         expected_state=recorded.checkpoint,
         reversibility=recorded.action.reversibility,
+        recorded_tier=recorded.tier,
     )
 
 

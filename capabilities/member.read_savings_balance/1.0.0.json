@@ -1,0 +1,322 @@
+{
+  "schema_version": "1.0.0",
+  "capability_id": "member.read_savings_balance",
+  "version": "1.0.0",
+  "base_url": "http://127.0.0.1:8000",
+  "vendor_product": "acme-core",
+  "vendor_version_range": ">=9.0 <10",
+  "approval_state": "approved",
+  "requires_secrets": [
+    "core_operator"
+  ],
+  "input_params": [
+    {
+      "name": "member_id",
+      "type": "string",
+      "pattern": "^\\d{3,9}$",
+      "required": true,
+      "sensitivity": "pii",
+      "description": "Value supplied for 'Member ID' during recording."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savings",
+      "type": "money",
+      "locator": {
+        "role": "cell",
+        "anchor": {
+          "stable_text": "Savings",
+          "relation": "same_row"
+        },
+        "frame_path": []
+      },
+      "transform": "parse_currency"
+    }
+  ],
+  "steps": [
+    {
+      "id": "s0",
+      "action": "navigate",
+      "value": "/",
+      "expected_state": {
+        "kind": "text",
+        "matcher": "Operator Sign On",
+        "timeout_ms": 8000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [
+          "record_not_found",
+          "permission_denied",
+          "invalid_member_id",
+          "invalid_credentials"
+        ],
+        "recover": [
+          "dismiss_known_dialog",
+          "retry_backoff",
+          "re_login"
+        ],
+        "otherwise": "escalate"
+      }
+    },
+    {
+      "id": "s1",
+      "action": "type",
+      "target": {
+        "role": "textbox",
+        "accessible_name": "User ID",
+        "anchor": {
+          "stable_text": "User ID:",
+          "relation": "label_for"
+        },
+        "frame_path": [
+          "main"
+        ],
+        "structural": "font > table:nth-of-type(1) > tbody > tr:nth-of-type(2) > td:nth-of-type(2) > input"
+      },
+      "value": "${secret:core_operator.username}",
+      "expected_state": {
+        "kind": "element_state",
+        "matcher": "value.length>0",
+        "timeout_ms": 8000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [],
+        "recover": [],
+        "otherwise": "hard_fail"
+      }
+    },
+    {
+      "id": "s2",
+      "action": "type",
+      "target": {
+        "role": "textbox",
+        "accessible_name": "Password",
+        "anchor": {
+          "stable_text": "Password:",
+          "relation": "label_for"
+        },
+        "frame_path": [
+          "main"
+        ],
+        "structural": "font > table:nth-of-type(1) > tbody > tr:nth-of-type(3) > td:nth-of-type(2) > input"
+      },
+      "value": "${secret:core_operator.password}",
+      "expected_state": {
+        "kind": "element_state",
+        "matcher": "value.length>0",
+        "timeout_ms": 8000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [],
+        "recover": [],
+        "otherwise": "hard_fail"
+      }
+    },
+    {
+      "id": "s3",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "accessible_name": "Sign On",
+        "visible_text": "Sign On",
+        "frame_path": [
+          "main"
+        ],
+        "structural": "font > table:nth-of-type(1) > tbody > tr:nth-of-type(4) > td:nth-of-type(2) > input"
+      },
+      "value": "",
+      "expected_state": {
+        "kind": "text",
+        "matcher": "Servicing",
+        "timeout_ms": 8000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [
+          "record_not_found",
+          "permission_denied",
+          "invalid_member_id",
+          "invalid_credentials"
+        ],
+        "recover": [
+          "dismiss_known_dialog",
+          "retry_backoff",
+          "re_login"
+        ],
+        "otherwise": "escalate"
+      }
+    },
+    {
+      "id": "s4",
+      "action": "type",
+      "target": {
+        "role": "textbox",
+        "accessible_name": "Member ID",
+        "anchor": {
+          "stable_text": "Member ID:",
+          "relation": "label_for"
+        },
+        "frame_path": [
+          "main",
+          "content"
+        ],
+        "structural": "font > table:nth-of-type(2) > tbody > tr:nth-of-type(1) > td:nth-of-type(2) > input"
+      },
+      "value": "${member_id}",
+      "expected_state": {
+        "kind": "element_state",
+        "matcher": "value==${member_id}",
+        "timeout_ms": 8000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [],
+        "recover": [],
+        "otherwise": "hard_fail"
+      }
+    },
+    {
+      "id": "s5",
+      "action": "click",
+      "target": {
+        "role": "button",
+        "accessible_name": "Search",
+        "visible_text": "Search",
+        "frame_path": [
+          "main",
+          "content"
+        ],
+        "structural": "font > table:nth-of-type(2) > tbody > tr:nth-of-type(3) > td:nth-of-type(2) > input"
+      },
+      "value": "",
+      "expected_state": {
+        "kind": "text",
+        "matcher": "Member Detail",
+        "timeout_ms": 8000
+      },
+      "reversibility": "safe",
+      "on_error": {
+        "business_outcomes": [
+          "record_not_found",
+          "permission_denied",
+          "invalid_member_id",
+          "invalid_credentials"
+        ],
+        "recover": [
+          "dismiss_known_dialog",
+          "retry_backoff",
+          "re_login"
+        ],
+        "otherwise": "escalate"
+      }
+    }
+  ],
+  "known_business_outcomes": [
+    {
+      "name": "record_not_found",
+      "detector": {
+        "kind": "text",
+        "matcher": "No member found",
+        "timeout_ms": 8000
+      },
+      "severity": "info",
+      "message": "No member exists with that Member ID.",
+      "outputs": {}
+    },
+    {
+      "name": "permission_denied",
+      "detector": {
+        "kind": "text",
+        "matcher": "not authorized",
+        "timeout_ms": 8000
+      },
+      "severity": "warn",
+      "message": "The operator is not authorized to view this record.",
+      "outputs": {}
+    },
+    {
+      "name": "invalid_member_id",
+      "detector": {
+        "kind": "text",
+        "matcher": "Enter a valid Member ID",
+        "timeout_ms": 8000
+      },
+      "severity": "warn",
+      "message": "The Member ID was rejected by the application's own validation.",
+      "outputs": {}
+    },
+    {
+      "name": "invalid_credentials",
+      "detector": {
+        "kind": "text",
+        "matcher": "Sign on failed",
+        "timeout_ms": 8000
+      },
+      "severity": "error",
+      "message": "The operator credential was rejected.",
+      "outputs": {}
+    }
+  ],
+  "recoverable_signatures": [
+    {
+      "name": "session_expired",
+      "detector": {
+        "kind": "text",
+        "matcher": "Session has expired",
+        "timeout_ms": 8000
+      },
+      "strategy": "re_login",
+      "max_attempts": 1
+    },
+    {
+      "name": "interstitial_dialog",
+      "detector": {
+        "kind": "element_state",
+        "matcher": "role=dialog visible",
+        "timeout_ms": 8000
+      },
+      "strategy": "dismiss_known_dialog",
+      "max_attempts": 2
+    }
+  ],
+  "success_checkpoint": {
+    "kind": "text",
+    "matcher": "Member Detail",
+    "timeout_ms": 10000
+  },
+  "safety": {
+    "allowlisted_domains": [
+      "127.0.0.1"
+    ],
+    "allowlisted_routes": [
+      "/**"
+    ],
+    "allowed_actions": [
+      "navigate",
+      "click",
+      "type",
+      "extract",
+      "assert",
+      "wait"
+    ],
+    "risky_actions": [
+      "close account",
+      "post transaction",
+      "wire transfer",
+      "delete",
+      "purge"
+    ],
+    "confirm_mode": "block_irreversible"
+  },
+  "provenance": {
+    "recorded_by": "scripted-planner",
+    "run_id": "discovery-20260908-201452",
+    "trace_ref": "evidence/discovery-20260908-201452",
+    "recorded_at": "2026-09-09T00:15:14.147445+00:00",
+    "goal": "look up member 12345 and read their savings balance"
+  }
+}

@@ -90,6 +90,7 @@ class Step(BaseModel):
     value: str = ""
     expected_state: Checkpoint | None = None
     reversibility: Reversibility = "safe"
+    recorded_tier: int | None = None  # the tier this descriptor resolved at when recorded
     on_error: OnErrorPolicy = Field(default_factory=OnErrorPolicy)
 
 

@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from ..artifact.models import Provenance
 from ..evidence.bus import EvidenceBus
 from ..policy.gate import ConfirmationRequired, PolicyDenied
-from ..surface.base import Action, LocatorUnresolved, SurfaceError
+from ..surface.base import Action, ElementDigest, LocatorUnresolved, SurfaceError
 from ..surface.web import WebSurface
 from . import prompts
 from .recorder import Recorder, probe_checkpoint
@@ -33,7 +33,7 @@ class ToolCall(BaseModel):
 class Planner(Protocol):
     """What the loop needs from a model. Kept narrow so the loop is readable."""
 
-    def decide(self, observation: str) -> ToolCall: ...
+    def decide(self, observation: str, digest: ElementDigest) -> ToolCall: ...
 
     @property
     def tokens(self) -> int: ...
@@ -57,7 +57,8 @@ class ClaudePlanner:
     def tokens(self) -> int:
         return self._tokens
 
-    def decide(self, observation: str) -> ToolCall:
+    def decide(self, observation: str, digest: ElementDigest) -> ToolCall:
+        del digest  # the model reads the digest through the observation text, not the object
         if self._pending_tool_use_id is None:
             self.messages.append({"role": "user", "content": observation})
         else:
@@ -136,7 +137,7 @@ class DiscoveryEngine:
             observation = prompts.observation(
                 goal, digest, self.detector.steps + 1, self.detector.budget.max_steps, note
             )
-            call = self.planner.decide(observation)
+            call = self.planner.decide(observation, digest)
             self.detector.spend(self.planner.tokens - self.detector.tokens)
             self.detector.steps += 1
             self.evidence.log("decision", tool=call.name, args=call.args)

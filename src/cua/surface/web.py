@@ -123,6 +123,8 @@ EXTRACT_BY_ANCHOR = r"""
 """
 
 
+PAGE_TEXT = "() => (document.body ? document.body.innerText : '')"
+
 LABEL_VALUE_PAIRS = r"""
 () => {
   const clean = s => (s || '').replace(/\s+/g, ' ').trim();

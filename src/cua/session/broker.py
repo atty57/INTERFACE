@@ -8,6 +8,7 @@ on escalation, so cookies, navigation state and half-filled forms all survive.
 
 from __future__ import annotations
 
+import atexit
 import os
 import socket
 from dataclasses import dataclass, field
@@ -22,6 +23,33 @@ def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+_driver: Playwright | None = None
+
+
+def driver() -> Playwright:
+    """One Playwright driver per process.
+
+    The sync API binds its event loop to the calling thread, so a second ``start()`` in the
+    same thread fails. A replay opened while a session is already alive is a legitimate
+    thing to do, so the driver is shared and only the browsers are per-session.
+    """
+    global _driver
+    if _driver is None:
+        _driver = sync_playwright().start()
+        atexit.register(shutdown)
+    return _driver
+
+
+def shutdown() -> None:
+    global _driver
+    if _driver is not None:
+        try:
+            _driver.stop()
+        except Exception:  # noqa: BLE001 - interpreter teardown
+            pass
+        _driver = None
 
 
 def _headless_default() -> bool:
@@ -45,7 +73,8 @@ class BrowserSession:
         self.lease.transfer(Holder.AUTOMATION)
 
     def close(self) -> None:
-        for shut in (self.browser.close, self.launched.close, self.playwright.stop):
+        # The driver stays up for the process; only this session's browsers close.
+        for shut in (self.browser.close, self.launched.close):
             try:
                 shut()
             except Exception:  # noqa: BLE001 - teardown must not mask a test failure
@@ -57,7 +86,7 @@ class SessionBroker:
     def launch(headless: bool | None = None) -> BrowserSession:
         headless = _headless_default() if headless is None else headless
         port = _free_port()
-        pw = sync_playwright().start()
+        pw = driver()
         launched = pw.chromium.launch(
             headless=headless, args=[f"--remote-debugging-port={port}"]
         )
