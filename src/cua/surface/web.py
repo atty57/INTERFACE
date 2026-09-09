@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urljoin
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Frame, Page
@@ -122,6 +123,22 @@ EXTRACT_BY_ANCHOR = r"""
 """
 
 
+LABEL_VALUE_PAIRS = r"""
+() => {
+  const clean = s => (s || '').replace(/\s+/g, ' ').trim();
+  const out = {};
+  document.querySelectorAll('tr').forEach(tr => {
+    const cells = tr.querySelectorAll('td, th');
+    if (cells.length !== 2) return;
+    if (cells[0].querySelector('input, select, textarea, a')) return;
+    const k = clean(cells[0].textContent), v = clean(cells[1].textContent);
+    if (k && v && k.length < 40) out[k] = v;
+  });
+  return out;
+}
+"""
+
+
 def norm(text: str | None) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip().rstrip(":").casefold()
 
@@ -170,6 +187,17 @@ class WebPerception:
                     )
                 )
         return digest
+
+    def label_value_pairs(self) -> dict[str, str]:
+        """Two-column table rows, which is how a legacy screen renders a field and its value."""
+        pairs: dict[str, str] = {}
+        for _, frame in self.frames():
+            try:
+                found = frame.evaluate(LABEL_VALUE_PAIRS)
+            except Exception:  # noqa: BLE001 - detached frame
+                continue
+            pairs.update(found or {})
+        return pairs
 
     def page_text(self) -> str:
         """Visible text across every frame, for text checkpoints and detectors."""
@@ -293,6 +321,7 @@ class WebSurface(WebPerception):
 
     def act(self, action: Action) -> Effect:
         self.lease.require(self.holder)
+        action = self._absolute(action)
         located, label, href = self._context(action)
         decision = self.gate.authorize(
             action.kind,
@@ -316,6 +345,12 @@ class WebSurface(WebPerception):
         return self._perform(action, located)
 
     # --- internals ----------------------------------------------------------------
+
+    def _absolute(self, action: Action) -> Action:
+        """A relative navigation target would slip past the domain check, so resolve first."""
+        if action.kind != "navigate" or not action.url:
+            return action
+        return action.model_copy(update={"url": urljoin(self.page.url, action.url)})
 
     def _context(self, action: Action) -> tuple[Located | None, str, str]:
         """Resolve the target before authorizing, so the gate judges the real control."""

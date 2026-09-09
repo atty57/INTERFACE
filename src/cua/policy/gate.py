@@ -52,6 +52,11 @@ class PolicyGate:
         if kind not in self.policy.allowed_actions:
             return Decision(verdict="deny", reason=f"action type '{kind}' is not allowlisted")
 
+        if kind == "navigate" and not url.startswith(("http://", "https://")):
+            return Decision(
+                verdict="deny", reason=f"navigation target is not an absolute http URL: {url!r}"
+            )
+
         for candidate in [u for u in (url, href) if u and u.startswith("http")]:
             if not self.policy.domain_allowed(candidate):
                 return Decision(verdict="deny", reason=f"domain not allowlisted: {candidate}")
