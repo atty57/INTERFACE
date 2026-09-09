@@ -1,0 +1,2 @@
+{"ts": 1788986593.5620897, "event": "intervention_abandoned", "request": "esc-a657ee7b"}
+{"ts": 1788986593.6116393, "event": "replay_finished", "result": {"kind": "failure", "failure_class": "escalation_timeout", "step_id": "s5", "expected": "text 'Member Detail'", "observed": "'interstitial_dialog' kept recurring; recovery exhausted", "run_id": "replay-console-demo-20260909-204210", "evidence_ref": "evidence/replay-console-demo-20260909-204210", "escalation_id": "esc-a657ee7b", "tiers_used": {"s1": 1, "s2": 1, "s3": 1, "s4": 1, "s5": 1}}}

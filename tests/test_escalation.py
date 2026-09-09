@@ -226,3 +226,105 @@ def test_the_intervention_summarizes_parameters_without_their_values(
     broker = EscalationBroker(evidence, operator=lambda r, s, w: "abort")
     run(artifact, session, base_url, evidence, broker)
     assert broker.queue[0].params_summary == {"member_id": "(redacted)"}
+
+
+def _console(broker):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(router(broker))
+    return TestClient(app)
+
+
+def test_the_console_shows_the_flow_that_led_to_the_stop(evidence):
+    """An operator needs the sequence, not just the step it died on."""
+    evidence.log("action", action={"kind": "click"}, label="Sign On", decision={"verdict": "allow"}, tier=1)
+    evidence.log("classified", step="s3", kind="match", matched=["s3"])
+    evidence.log("recovery_attempt", step="s5", strategy="dismiss_known_dialog", attempt=1)
+    evidence.log("lease_claimed", request="esc-1")
+
+    page = _console(EscalationBroker(evidence)).get("/operator").text
+    assert "Sign On" in page
+    assert "dismiss_known_dialog (attempt 1)" in page
+    assert "a human took control" in page
+
+
+def test_the_console_renders_the_screenshot_rather_than_its_path(
+    artifact, session, base_url, evidence
+):
+    """Asserted while the operator is actually looking at it, mid-handoff."""
+    seen: dict = {}
+
+    def look(request, session_, surface_):
+        client = _console(broker)
+        seen["page"] = client.get("/operator").text
+        seen["shot"] = client.get(f"/operator/{request.id}/screenshot")
+        seen["id"] = request.id
+        return "abort"
+
+    broker = EscalationBroker(evidence, operator=look)
+    run(artifact, session, base_url, evidence, broker)
+
+    assert f'src="/operator/{seen["id"]}/screenshot"' in seen["page"]
+    assert seen["shot"].status_code == 200
+    assert seen["shot"].headers["content-type"] == "image/png"
+    assert seen["shot"].content[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_the_operator_sees_the_stopping_step_and_the_flow_that_led_there(
+    artifact, session, base_url, evidence
+):
+    seen: dict = {}
+
+    def look(request, session_, surface_):
+        seen["page"] = _console(broker).get("/operator").text
+        return "abort"
+
+    broker = EscalationBroker(evidence, operator=look)
+    run(artifact, session, base_url, evidence, broker)
+
+    page = seen["page"]
+    assert "s5" in page and "Member Detail" in page
+    for verb in ("Claim", "Done", "Abort"):
+        assert verb in page
+    assert "recovery_attempt" in page  # the sequence, not just the endpoint
+
+
+def test_the_screenshot_route_serves_nothing_outside_the_run_evidence(evidence):
+    from cua.escalate.broker import InterventionRequest
+
+    broker = EscalationBroker(evidence)
+    broker.queue.append(
+        InterventionRequest(
+            capability_id=CAPABILITY,
+            goal="g",
+            step_id="s1",
+            why_stopped="w",
+            expected="e",
+            observed="o",
+            screenshot_ref="C:/Windows/win.ini" if __import__("os").name == "nt" else "/etc/passwd",
+        )
+    )
+    got = _console(broker).get(f"/operator/{broker.queue[0].id}/screenshot")
+    assert got.status_code == 404
+
+
+def test_screen_text_from_the_page_cannot_inject_markup_into_the_console(evidence):
+    """Observed text is page content, so it is escaped, never rendered as markup."""
+    from cua.escalate.broker import InterventionRequest
+
+    broker = EscalationBroker(evidence)
+    broker.queue.append(
+        InterventionRequest(
+            capability_id=CAPABILITY,
+            goal="g",
+            step_id="s1",
+            why_stopped="w",
+            expected="e",
+            observed="<script>alert(1)</script>",
+        )
+    )
+    page = _console(broker).get("/operator").text
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;" in page

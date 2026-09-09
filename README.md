@@ -141,8 +141,14 @@ python -m cua replay --capability member.read_savings_balance \
 ```
 
 A stuck notice keeps coming back, bounded recovery exhausts, and an intervention is raised.
-Open <http://127.0.0.1:8765/operator>: it shows the goal, the step, why it stopped, the last
-verified checkpoint, and a masked screenshot.
+Open <http://127.0.0.1:8765/operator>. It shows the goal, the step, why it stopped, expected
+versus observed, the last verified checkpoint, the masked screenshot of the screen it stopped
+on — and the whole flow that led there: every action with its policy verdict and the locator
+tier that resolved it, both capped recovery attempts, and the exhaustion. It refreshes itself,
+so you can watch the run as it happens.
+
+The live screen is not streamed and does not need to be: the Chrome window this run is
+driving is on your desktop, and after **Claim** you drive that same window.
 
 - **Claim** takes the lease. Automation is now physically unable to act — `Surface.act()`
   raises. The Chrome window automation was driving is still on screen, still signed on.

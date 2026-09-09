@@ -205,6 +205,13 @@ redacted parameter summary → the operator **claims** (lease → `HUMAN`; autom
 genuinely unable to act, which a test asserts) → their clicks, field changes and navigations
 stream into the evidence trail as `human_actions[]` → **Done** or **Abort**.
 
+The console renders the *flow*, not just the endpoint: every action with its policy verdict
+and resolving locator tier, each capped recovery attempt, and the exhaustion — read from the
+same `steps.jsonl` the audit trail is built on. Deciding whether to take over is a judgement
+about how the run got here, so showing only the final step would make the operator
+reconstruct it from logs. Page-derived text is escaped on the way in, because `observed` is
+content the target application wrote.
+
 **Handback re-anchors; it never assumes.** The engine re-asserts the current step's expected
 state (the operator finished the step → resume without repeating the action) or the previous
 step's (they restored the starting state → perform the action again). If neither holds, the

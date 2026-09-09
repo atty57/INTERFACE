@@ -11,17 +11,23 @@ verbs and the context bundle would be identical.
 from __future__ import annotations
 
 import threading
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from .broker import EscalationBroker
 
-PAGE = """<html><head><title>Operator console</title></head>
-<body style="font-family:system-ui;margin:2rem;max-width:60rem">
+PAGE = """<html><head><title>Operator console</title>
+<meta http-equiv="refresh" content="3"></head>
+<body style="font-family:system-ui;margin:2rem;max-width:64rem;color:#111">
 <h2>Operator console</h2>
 {body}
+<h3>What the agent has been doing</h3>
+<p style="color:#666;margin-top:-.5rem">The live screen is the Chrome window this run is
+driving. Claiming takes the lease so you can drive that same window by hand.</p>
+{feed}
 </body></html>"""
 
 CARD = """<div style="border:1px solid #ccc;padding:1rem;margin-bottom:1rem">
@@ -34,16 +40,77 @@ CARD = """<div style="border:1px solid #ccc;padding:1rem;margin-bottom:1rem">
 <tr><td>Last good checkpoint</td><td>{last_good_checkpoint}</td></tr>
 <tr><td>Proposed action</td><td>{proposed_action}</td></tr>
 <tr><td>Parameters</td><td>{params_summary}</td></tr>
-<tr><td>Screenshot</td><td>{screenshot_ref}</td></tr>
 </table>
+<p style="margin:.5rem 0 0"><b>Where it stopped</b></p>
+<img src="/operator/{id}/screenshot" alt="the screen where automation stopped"
+     style="max-width:100%;border:1px solid #ddd">
 <form method="post" action="/operator/{id}/claim" style="display:inline"><button>Claim</button></form>
 <form method="post" action="/operator/{id}/done" style="display:inline"><button>Done</button></form>
 <form method="post" action="/operator/{id}/abort" style="display:inline"><button>Abort</button></form>
 </div>"""
 
-EMPTY = """<p>No open interventions.</p>
-<p style="color:#666">Automation raises one here when it stops. The browser window it was
-driving stays open; claiming takes the lease so you can drive that same session by hand.</p>"""
+EMPTY = """<p>No open interventions. Automation raises one here when it stops.</p>"""
+
+FEED = """<table cellpadding="5" cellspacing="0" border="1"
+style="border-collapse:collapse;font-size:.85rem;width:100%">
+<tr style="background:#eee"><th align="left">Step</th><th align="left">What happened</th>
+<th align="left">Detail</th></tr>
+{rows}
+</table>"""
+
+FEED_EMPTY = """<p style="color:#666">Nothing recorded yet.</p>"""
+
+# The events an operator actually needs to follow the flow. The rest of the log is for
+# whoever debugs the run afterwards.
+INTERESTING = {
+    "action": lambda e: (
+        f"{e.get('action', {}).get('kind', '')} {e.get('label') or ''}".strip()
+        + f" [{e.get('decision', {}).get('verdict', '')}]"
+        + (f" tier {e['tier']}" if e.get("tier") else "")
+    ),
+    "classified": lambda e: f"{e.get('kind')}: {', '.join(e.get('matched') or []) or 'nothing'}",
+    "recovery_attempt": lambda e: f"{e.get('strategy')} (attempt {e.get('attempt')})",
+    "recovery_exhausted": lambda e: f"{e.get('signature')} gave up after {e.get('cap')}",
+    "policy_denied": lambda e: str(e.get("reason", "")),
+    "escalation_required": lambda e: str(e.get("reason", "")),
+    "intervention_raised": lambda e: str(e.get("why_stopped", "")),
+    "lease_claimed": lambda e: "a human took control",
+    "human_action": lambda e: f"human {e.get('kind')}: {e.get('target', '')}",
+    "re_anchor_failed": lambda e: "handback refused: the screen could not be placed",
+    "resumed_after_handoff": lambda e: f"resumed ({e.get('resolution')})",
+    "replay_finished": lambda e: str((e.get("result") or {}).get("kind", "")),
+}
+
+
+def _escape(text: object) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _feed(broker: EscalationBroker, limit: int = 40) -> str:
+    """The agent's recent flow, read from the same evidence the audit trail is built on."""
+    rows = []
+    for event in broker.evidence.read()[-limit:]:
+        describe = INTERESTING.get(str(event.get("event")))
+        if describe is None:
+            continue
+        try:
+            detail = describe(event)
+        except Exception:  # noqa: BLE001 - a malformed record must not break the console
+            detail = ""
+        rows.append(
+            "<tr><td><code>{step}</code></td><td>{event}</td><td>{detail}</td></tr>".format(
+                step=_escape(event.get("step") or event.get("step_id") or ""),
+                event=_escape(event.get("event")),
+                detail=_escape(detail),
+            )
+        )
+    return FEED.format(rows="".join(rows)) if rows else FEED_EMPTY
 
 
 def router(broker: EscalationBroker) -> APIRouter:
@@ -52,12 +119,30 @@ def router(broker: EscalationBroker) -> APIRouter:
     @api.get("/operator", response_class=HTMLResponse)
     def index() -> str:
         requests = broker.open_requests()
-        body = "".join(CARD.format(**r.model_dump()) for r in requests) or EMPTY
-        return PAGE.format(body=body)
+        cards = [CARD.format(**{k: _escape(v) for k, v in r.model_dump().items()})
+                 for r in requests]
+        return PAGE.format(body="".join(cards) or EMPTY, feed=_feed(broker))
 
     @api.get("/operator/api")
     def as_json() -> list[dict[str, Any]]:
         return [r.model_dump() for r in broker.open_requests()]
+
+    @api.get("/operator/{request_id}/screenshot")
+    def screenshot(request_id: str) -> Response:
+        """Serve the masked capture taken where automation stopped."""
+        found = broker.find(request_id)
+        if found is None or not found.screenshot_ref:
+            return Response(status_code=404)
+        path = Path(found.screenshot_ref)
+        # Only ever serve the masked shot this request already points at, and only from
+        # inside the run's own evidence directory.
+        try:
+            path.resolve().relative_to(broker.evidence.dir.resolve())
+        except ValueError:
+            return Response(status_code=404)
+        if path.suffix != ".png" or not path.is_file():
+            return Response(status_code=404)
+        return Response(path.read_bytes(), media_type="image/png")
 
     @api.post("/operator/{request_id}/claim")
     def claim(request_id: str) -> RedirectResponse:
