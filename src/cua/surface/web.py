@@ -9,10 +9,16 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Frame, Page
 
+from ..policy.gate import ConfirmationRequired, PolicyDenied, PolicyGate
+from ..session.lease import ControlLease, Holder
+
 from .base import (
+    Action,
     DigestEntry,
+    Effect,
     ElementDigest,
     Located,
     LocatorDescriptor,
@@ -253,3 +259,106 @@ def _tiers(
         match("visible_text", desc.visible_text),
         match("near", desc.anchor.stable_text if desc.anchor else None),
     ]
+
+
+LABEL_JS = r"""
+el => (el.getAttribute('aria-label') || el.getAttribute('title')
+       || ((el.type === 'submit' || el.type === 'button' || el.type === 'reset') ? el.value : '')
+       || el.textContent || '').replace(/\s+/g, ' ').trim()
+"""
+
+HREF_JS = "el => (el.tagName === 'A' ? el.href : '')"
+
+
+class WebSurface(WebPerception):
+    """Perception plus action. The only class that can act, so the gate cannot be skipped.
+
+    ``act()`` asserts the lease, authorizes through the policy gate, writes the decision to
+    evidence — allowed, denied, or escalated alike — and only then touches the page.
+    """
+
+    def __init__(
+        self,
+        page: Page,
+        gate: PolicyGate,
+        lease: ControlLease,
+        holder: Holder = Holder.AUTOMATION,
+        evidence: Any = None,
+    ) -> None:
+        super().__init__(page)
+        self.gate = gate
+        self.lease = lease
+        self.holder = holder
+        self.evidence = evidence
+
+    def act(self, action: Action) -> Effect:
+        self.lease.require(self.holder)
+        located, label, href = self._context(action)
+        decision = self.gate.authorize(
+            action.kind,
+            url=action.url,
+            label=label,
+            href=href,
+            declared=action.reversibility,
+        )
+        if self.evidence is not None:
+            self.evidence.log(
+                "action",
+                action=action.model_dump(exclude_none=True),
+                decision=decision.model_dump(),
+                label=label,
+                tier=located.tier if located else None,
+            )
+        if decision.verdict == "deny":
+            raise PolicyDenied(decision.reason)
+        if decision.verdict == "confirm_required":
+            raise ConfirmationRequired(decision.reason, decision)
+        return self._perform(action, located)
+
+    # --- internals ----------------------------------------------------------------
+
+    def _context(self, action: Action) -> tuple[Located | None, str, str]:
+        """Resolve the target before authorizing, so the gate judges the real control."""
+        if action.kind in ("navigate", "wait", "assert"):
+            return None, action.url, ""
+        if action.kind not in self.gate.policy.allowed_actions:
+            return None, "", ""  # deny without doing any work
+        if action.kind == "extract":
+            return None, "", ""
+        located = self._resolve(action)
+        return located, located.handle.evaluate(LABEL_JS), located.handle.evaluate(HREF_JS)
+
+    def _resolve(self, action: Action) -> Located:
+        if action.index is not None:
+            entry = next(
+                (e for e in self.snapshot().entries if e.index == action.index), None
+            )
+            if entry is None:
+                raise SurfaceError(f"no control at digest index {action.index}")
+            return Located(tier=0, handle=self.handle_for(entry))
+        if action.target is None:
+            raise SurfaceError(f"{action.kind} needs a target")
+        return self.locate(action.target)
+
+    def _perform(self, action: Action, located: Located | None) -> Effect:
+        tier = located.tier if located else None
+        try:
+            if action.kind == "navigate":
+                self.page.goto(action.url, wait_until="load")
+            elif action.kind == "click":
+                assert located is not None
+                located.handle.click()
+            elif action.kind == "type":
+                assert located is not None
+                located.handle.fill(self.gate.resolve(action.value))
+            elif action.kind == "select":
+                assert located is not None
+                located.handle.select_option(self.gate.resolve(action.value))
+            elif action.kind == "extract":
+                assert action.target is not None
+                return Effect(
+                    action=action, tier=4, extracted=self.extract(action.target), url=self.page.url
+                )
+        except PlaywrightError as failure:
+            raise SurfaceError(f"{action.kind} failed: {failure}") from failure
+        return Effect(action=action, tier=tier, url=self.page.url)

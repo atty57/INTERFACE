@@ -14,6 +14,8 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
+from ..policy.policy import Reversibility
+
 ActionKind = Literal["navigate", "click", "type", "select", "extract", "assert", "wait"]
 AnchorRelation = Literal["label_for", "same_row", "same_cell", "following"]
 
@@ -107,6 +109,7 @@ class Action(BaseModel):
     target: LocatorDescriptor | None = None
     value: str = ""
     url: str = ""
+    reversibility: Reversibility = "safe"  # the artifact's claim; policy may overrule it
 
 
 class Effect(BaseModel):
