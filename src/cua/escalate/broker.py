@@ -20,8 +20,9 @@ from pydantic import BaseModel, Field
 from ..artifact.models import CapabilityArtifact, Step
 from ..evidence.bus import EvidenceBus
 from ..replay.detectors import evaluate
+
 # What the escalator hands back to the engine: the step is done, or it should be repeated.
-from ..replay.engine import RESUME, RETRY
+from ..replay.engine import ABANDONED, ABORTED, RESUME, RETRY
 from ..session.human_events import HumanActivityRecorder
 from ..session.lease import Holder
 
@@ -75,14 +76,17 @@ class EscalationBroker:
 
     # --- the hook the replay engine calls -------------------------------------------
 
-    def escalator(self, session: Any, surface: Any) -> Callable[..., str | None]:
+    def escalator(
+        self, session: Any, surface: Any, params: dict[str, Any] | None = None
+    ) -> Callable[..., str | None]:
         self._session = session
         self._surface = surface
+        bound = params or {}
 
         def hook(
             artifact: CapabilityArtifact, step: Step, expected: str, observed: str
         ) -> str | None:
-            return self.raise_intervention(artifact, step, expected, observed)
+            return self.raise_intervention(artifact, step, expected, observed, bound)
 
         return hook
 
@@ -170,7 +174,7 @@ class EscalationBroker:
         request.state = "aborted"
         self._session.lease.transfer(Holder.AUTOMATION)
         self.evidence.log("intervention_aborted", request=request.id)
-        return request.id
+        return f"{ABORTED}:{request.id}"
 
     # --- internals ---------------------------------------------------------------------
 
@@ -180,12 +184,12 @@ class EscalationBroker:
             if request.state == "resolved":
                 return request.resolution
             if request.state == "aborted":
-                return request.id
+                return f"{ABORTED}:{request.id}"
             time.sleep(0.25)
         request.state = "abandoned"
         self._session.lease.transfer(Holder.AUTOMATION)
         self.evidence.log("intervention_abandoned", request=request.id)
-        return request.id
+        return f"{ABANDONED}:{request.id}"
 
     def _re_anchor(self) -> str | None:
         """Two questions only: is the step done, or are we back where it starts?"""

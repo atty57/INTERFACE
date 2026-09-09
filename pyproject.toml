@@ -38,3 +38,8 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Perception code walks live frames that can detach mid-walk, and evidence must degrade
+# rather than block. Both are deliberate swallow-and-continue paths, commented in place.
+ignore = ["S110", "S112"]

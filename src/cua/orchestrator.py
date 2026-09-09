@@ -97,7 +97,7 @@ def execute(
         evidence,
         params,
         base_url=target,
-        escalator=escalation.escalator(session, surface) if escalation else None,
+        escalator=escalation.escalator(session, surface, params) if escalation else None,
     )
     return engine.run()
 
@@ -114,7 +114,7 @@ def replay(
     evidence_root: Path | str = "evidence",
     escalation: EscalationBroker | None = None,
 ) -> RunResult:
-    run_id = f"replay-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_id = f"replay-{dt.datetime.now(dt.UTC).strftime('%Y%m%d-%H%M%S')}"
     evidence = EvidenceBus(run_id, root=evidence_root, redactor=Redactor())
 
     try:

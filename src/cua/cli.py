@@ -40,6 +40,7 @@ def _record(args: argparse.Namespace) -> int:
         capability_id=args.capability,
         version=args.artifact_version,
         planner_kind=args.planner,
+        model=args.model,
         headless=not args.headful,
     )
     emit(result.model_dump())
@@ -87,6 +88,15 @@ def _replay(args: argparse.Namespace) -> int:
     return 0 if result.kind != "failure" else 2
 
 
+def _catalog(args: argparse.Namespace) -> int:
+    from .artifact.store import ArtifactStore
+    from .catalog.registry import CapabilityCatalog
+
+    catalog = CapabilityCatalog(ArtifactStore(args.store_root))
+    emit({"tools": catalog.tools()})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cua", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -108,10 +118,14 @@ def build_parser() -> argparse.ArgumentParser:
     rec.add_argument("--artifact-version", default="1.0.0")
     rec.add_argument(
         "--planner",
-        choices=["claude", "scripted"],
+        choices=["claude", "openrouter", "scripted"],
         default="claude",
-        help="'claude' needs ANTHROPIC_API_KEY; 'scripted' reproduces a recording without one",
+        help=(
+            "'claude' needs ANTHROPIC_API_KEY; 'openrouter' needs OPENROUTER_API_KEY; "
+            "'scripted' reproduces a recording with no model at all"
+        ),
     )
+    rec.add_argument("--model", default="", help="override the planner's model id")
     rec.add_argument("--headful", action="store_true", default=True)
     rec.add_argument("--headless", dest="headful", action="store_false")
     rec.set_defaults(func=_record)
@@ -129,6 +143,10 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--headful", action="store_true")
     rep.set_defaults(func=_replay)
 
+    cat = sub.add_parser("catalog", help="list approved capabilities as tool definitions")
+    cat.add_argument("--store-root", default="capabilities")
+    cat.set_defaults(func=_catalog)
+
     app = sub.add_parser("approve", help="move a reviewed artifact from draft to approved")
     app.add_argument("--capability", required=True)
     app.add_argument("--artifact-version", required=True)
@@ -138,6 +156,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from .config import load_env
+
+    load_env()
     args = build_parser().parse_args(argv)
     return int(args.func(args))
 

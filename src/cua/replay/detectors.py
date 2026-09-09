@@ -128,12 +128,12 @@ def race(
         if len(hits) > 1:
             # Never guess between two readings of the screen.
             return RaceOutcome(
-                kind="ambiguous", matched=[c.name for c in hits], observed=_summarize(screen)
+                kind="ambiguous", matched=[c.name for c in hits], observed=summarize(screen)
             )
         if time.monotonic() >= deadline:
-            return RaceOutcome(kind="timeout", observed=_summarize(surface.page_text()))
+            return RaceOutcome(kind="timeout", observed=summarize(surface.page_text()))
         time.sleep(poll_ms / 1000)
 
 
-def _summarize(screen: str) -> str:
+def summarize(screen: str) -> str:
     return " / ".join(line.strip() for line in screen.splitlines() if line.strip())[:300]

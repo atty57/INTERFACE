@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from .artifact.models import CapabilityArtifact, Provenance
 from .artifact.store import ArtifactStore
 from .discover.loop import MODEL, ClaudePlanner, DiscoveryEngine, DiscoveryOutcome, Planner
+from .discover.openrouter import DEFAULT_MODEL as OPENROUTER_MODEL
+from .discover.openrouter import OpenRouterPlanner
 from .discover.prompts import SYSTEM
 from .discover.recorder import Recorder
 from .discover.scripted import ScriptedPlanner
@@ -44,13 +46,14 @@ def record(
     capability_id: str,
     version: str = "1.0.0",
     planner_kind: str = "claude",
+    model: str = "",
     headless: bool | None = None,
     budget: Budget | None = None,
     evidence_root: Path | str = "evidence",
     store_root: Path | str = "capabilities",
     secret_handles: list[str] | None = None,
 ) -> RecordingResult:
-    run_id = f"discovery-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    run_id = f"discovery-{dt.datetime.now(dt.UTC).strftime('%Y%m%d-%H%M%S')}"
     secrets = SecretResolver(secret_handles or DEFAULT_SECRET_HANDLES)
     secrets.check_available()
     evidence = EvidenceBus(run_id, root=evidence_root, redactor=Redactor(secrets.values()))
@@ -62,9 +65,7 @@ def record(
         surface = WebSurface(
             session.page, PolicyGate(policy, secrets), session.lease, evidence=evidence
         )
-        planner: Planner = (
-            ScriptedPlanner(goal) if planner_kind == "scripted" else ClaudePlanner(SYSTEM)
-        )
+        planner = _planner(planner_kind, goal, model)
         recorder = Recorder()
         engine = DiscoveryEngine(surface, planner, recorder, evidence, budget)
         evidence.log("run_started", goal=goal, target=target, planner=planner_kind)
@@ -82,7 +83,7 @@ def record(
             final_values=outcome.final_values,
             policy=policy,
             provenance=Provenance(
-                recorded_by=MODEL if planner_kind == "claude" else "scripted-planner",
+                recorded_by=_recorded_by(planner_kind, model),
                 run_id=run_id,
                 trace_ref=evidence.ref,
             ),
@@ -97,6 +98,22 @@ def record(
         )
     finally:
         session.close()
+
+
+def _planner(kind: str, goal: str, model: str) -> Planner:
+    if kind == "scripted":
+        return ScriptedPlanner(goal)
+    if kind == "openrouter":
+        return OpenRouterPlanner(SYSTEM, model or OPENROUTER_MODEL)
+    return ClaudePlanner(SYSTEM, model or MODEL)
+
+
+def _recorded_by(kind: str, model: str) -> str:
+    if kind == "scripted":
+        return "scripted-planner"
+    if kind == "openrouter":
+        return f"openrouter:{model or OPENROUTER_MODEL}"
+    return model or MODEL
 
 
 def approve(store: ArtifactStore, capability_id: str, version: str) -> CapabilityArtifact:

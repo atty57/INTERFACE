@@ -17,12 +17,15 @@ from ..evidence.bus import EvidenceBus
 from ..policy.gate import ConfirmationRequired, PolicyDenied
 from ..surface.base import Action, LocatorUnresolved, SurfaceError
 from ..surface.web import WebSurface
-from .detectors import Candidate, RaceOutcome, bind, race
+from .detectors import Candidate, RaceOutcome, bind, race, summarize
 from .outcomes import BusinessOutcome, Failure, RunResult, Success
 from .recovery import BACKOFF_SECONDS, DISMISS_CONTROL, REPEAT_ACTION_AFTER, RecoveryLedger
 
+# What an escalation hands back: the step is done, repeat it, or the run is over.
 RESUME = "resume"
 RETRY = "retry"
+ABORTED = "aborted"
+ABANDONED = "abandoned"
 
 MAX_ROUNDS_PER_STEP = 8
 
@@ -305,9 +308,13 @@ class ReplayEngine:
     ) -> RunResult | str:
         """A string means an operator took the wheel, resolved it, and handed control back."""
         expected = self._expected(step, index)
-        observed = outcome.observed if outcome else "recovery rounds exhausted"
+        observed = outcome.observed if outcome else ""
         if outcome and outcome.kind == "ambiguous":
             observed = f"matched {outcome.matched} at once: {outcome.observed}"
+        elif outcome and outcome.role == "recoverable":
+            observed = f"'{outcome.name}' kept recurring; recovery exhausted"
+        if not observed:
+            observed = summarize(self.surface.page_text())
         self.evidence.screenshot(self.surface.page, f"{step.id}-{failure_class}")
         escalation_id = None
         if self.escalator is not None and step.on_error.otherwise == "escalate":
@@ -315,7 +322,14 @@ class ReplayEngine:
             if resolution in (RESUME, RETRY):
                 self.evidence.log("resumed_after_handoff", step=step.id, resolution=resolution)
                 return resolution
-            escalation_id = resolution
+            if resolution and ":" in resolution:
+                verdict, escalation_id = resolution.split(":", 1)
+                failure_class = {
+                    ABORTED: "operator_aborted",
+                    ABANDONED: "escalation_timeout",
+                }.get(verdict, failure_class)
+            else:
+                escalation_id = resolution
         return Failure(
             failure_class=failure_class,
             step_id=step.id,

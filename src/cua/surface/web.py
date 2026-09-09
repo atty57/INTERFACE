@@ -15,7 +15,6 @@ from playwright.sync_api import Frame, Page
 
 from ..policy.gate import ConfirmationRequired, PolicyDenied, PolicyGate
 from ..session.lease import ControlLease, Holder
-
 from .base import (
     Action,
     DigestEntry,
