@@ -1,0 +1,205 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Record Once, Replay Forever",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1150,
+      660
+    ]
+  },
+  "lanes": [
+    {
+      "id": "discover",
+      "label": "Discovery — a model, once"
+    },
+    {
+      "id": "store",
+      "label": "Capability store (git)"
+    },
+    {
+      "id": "produce",
+      "label": "Production — no model"
+    },
+    {
+      "id": "human",
+      "label": "Human control",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "learn",
+      "label": "Learn it",
+      "fromCol": 0,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "freeze",
+      "label": "Freeze it",
+      "fromCol": 3,
+      "toCol": 3
+    },
+    {
+      "id": "run",
+      "label": "Run it forever",
+      "fromCol": 4,
+      "toCol": 5,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "goal",
+    "discovery",
+    "recorder",
+    "artifact",
+    "replay",
+    "result"
+  ],
+  "semanticChecks": {
+    "allowedRoots": [
+      "goal"
+    ],
+    "allowedTerminals": [
+      "result"
+    ],
+    "requiredPaths": [
+      {
+        "from": "goal",
+        "to": "result"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "goal",
+      "lane": "discover",
+      "col": 0,
+      "type": "external",
+      "label": "Goal",
+      "sublabel": "plain language"
+    },
+    {
+      "id": "discovery",
+      "lane": "discover",
+      "col": 1,
+      "type": "backend",
+      "label": "Discovery",
+      "sublabel": "observe to act"
+    },
+    {
+      "id": "recorder",
+      "lane": "discover",
+      "col": 2,
+      "type": "backend",
+      "label": "Recorder",
+      "sublabel": "generalize"
+    },
+    {
+      "id": "artifact",
+      "lane": "store",
+      "col": 3,
+      "type": "database",
+      "label": "Artifact",
+      "sublabel": "typed · versioned",
+      "tag": "draft to approved"
+    },
+    {
+      "id": "replay",
+      "lane": "produce",
+      "col": 4,
+      "type": "backend",
+      "label": "Replay",
+      "sublabel": "no model"
+    },
+    {
+      "id": "result",
+      "lane": "produce",
+      "col": 5,
+      "type": "backend",
+      "label": "Result",
+      "sublabel": "three arms"
+    },
+    {
+      "id": "operator",
+      "lane": "human",
+      "col": 4,
+      "type": "security",
+      "label": "Operator",
+      "sublabel": "takes the lease"
+    }
+  ],
+  "edges": [
+    {
+      "id": "goal-discovery",
+      "from": "goal",
+      "to": "discovery",
+      "variant": "emphasis"
+    },
+    {
+      "id": "discovery-recorder",
+      "from": "discovery",
+      "to": "recorder",
+      "label": "verified only",
+      "variant": "emphasis"
+    },
+    {
+      "id": "recorder-artifact",
+      "from": "recorder",
+      "to": "artifact",
+      "label": "generalize",
+      "variant": "emphasis"
+    },
+    {
+      "id": "artifact-replay",
+      "from": "artifact",
+      "to": "replay",
+      "label": "approved only",
+      "variant": "emphasis"
+    },
+    {
+      "id": "replay-result",
+      "from": "replay",
+      "to": "result",
+      "label": "typed",
+      "variant": "emphasis"
+    },
+    {
+      "id": "replay-operator",
+      "from": "replay",
+      "to": "operator",
+      "label": "cannot finish",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "operator-replay",
+      "from": "operator",
+      "to": "replay",
+      "label": "resume",
+      "variant": "dashed",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Discover once",
+      "items": [
+        "A model drives the live app to work out how the goal is done",
+        "A run that gets stuck stops and reports why, recording nothing"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Replay forever",
+      "items": [
+        "No model is reachable from the production path",
+        "A clean clone replays the committed artifact with no credentials"
+      ]
+    }
+  ]
+}

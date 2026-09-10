@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Discovery: The Model Drives, Once",
+    "locale": "en",
+    "viewBox": [
+      1080,
+      580
+    ],
+    "quality_profile": "showcase",
+    "column_fit": "spread"
+  },
+  "participants": [
+    {
+      "id": "cli",
+      "type": "external",
+      "label": "Engineer",
+      "sublabel": "cua record"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "Discovery",
+      "sublabel": "observe to act"
+    },
+    {
+      "id": "model",
+      "type": "cloud",
+      "label": "Claude Opus 5",
+      "sublabel": "in the loop"
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Policy Gate",
+      "sublabel": "deny by default"
+    },
+    {
+      "id": "surface",
+      "type": "frontend",
+      "label": "WebSurface",
+      "sublabel": "Playwright"
+    },
+    {
+      "id": "recorder",
+      "type": "backend",
+      "label": "Recorder",
+      "sublabel": "one-way door"
+    },
+    {
+      "id": "evidence",
+      "type": "database",
+      "label": "Evidence Bus",
+      "sublabel": "redacted"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 230,
+      "label": "Observe"
+    },
+    {
+      "from": 236,
+      "to": 370,
+      "label": "Decide + authorize"
+    },
+    {
+      "from": 376,
+      "to": 455,
+      "label": "Record"
+    }
+  ],
+  "messages": [
+    {
+      "id": "record",
+      "from": "cli",
+      "to": "engine",
+      "y": 160,
+      "label": "record(goal, target)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "snapshot",
+      "from": "engine",
+      "to": "surface",
+      "y": 188,
+      "label": "snapshot()",
+      "variant": "default"
+    },
+    {
+      "id": "digest",
+      "from": "surface",
+      "to": "engine",
+      "y": 216,
+      "label": "digest + screenshot",
+      "variant": "return"
+    },
+    {
+      "id": "ask",
+      "from": "engine",
+      "to": "model",
+      "y": 244,
+      "label": "goal + digest as data",
+      "variant": "emphasis"
+    },
+    {
+      "id": "decide",
+      "from": "model",
+      "to": "engine",
+      "y": 272,
+      "label": "click(i) · type(i,v) · done",
+      "variant": "return"
+    },
+    {
+      "id": "authorize",
+      "from": "engine",
+      "to": "gate",
+      "y": 300,
+      "label": "authorize(action)",
+      "variant": "security"
+    },
+    {
+      "id": "deny",
+      "from": "gate",
+      "to": "engine",
+      "y": 328,
+      "label": "DENY, logged",
+      "variant": "security"
+    },
+    {
+      "id": "act",
+      "from": "gate",
+      "to": "surface",
+      "y": 356,
+      "label": "act, secrets at act-time",
+      "variant": "emphasis"
+    },
+    {
+      "id": "verified",
+      "from": "engine",
+      "to": "recorder",
+      "y": 384,
+      "label": "verified action + checkpoint",
+      "variant": "default"
+    },
+    {
+      "id": "log",
+      "from": "engine",
+      "to": "evidence",
+      "y": 412,
+      "label": "redacted step log",
+      "variant": "dashed"
+    },
+    {
+      "id": "artifact",
+      "from": "recorder",
+      "to": "cli",
+      "y": 440,
+      "label": "artifact (draft)",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "engine",
+      "from": 172,
+      "to": 448
+    },
+    {
+      "participant": "model",
+      "from": 244,
+      "to": 272
+    },
+    {
+      "participant": "gate",
+      "from": 300,
+      "to": 356
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The model decides, it never acts",
+      "items": [
+        "Page text enters the context as data, never as instruction",
+        "Every action is authorized before the surface touches the page"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Only verified actions are recorded",
+      "items": [
+        "A denial is logged as evidence and the loop continues",
+        "The Recorder emits from checkpoints, never from the transcript"
+      ]
+    }
+  ]
+}

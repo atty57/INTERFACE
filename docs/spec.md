@@ -328,6 +328,8 @@ No coordinate fallback until a real discovery run fails for want of one.
 
 ### The loop
 
+Rendered: [`diagrams/discovery.sequence.png`](diagrams/discovery.sequence.png)
+
 ```mermaid
 sequenceDiagram
   autonumber
@@ -412,6 +414,8 @@ correct primitive is a single timed race.
 ```
 
 ### Full flow
+
+Rendered: [`diagrams/replay.workflow.png`](diagrams/replay.workflow.png)
 
 ```mermaid
 flowchart TD
@@ -498,6 +502,8 @@ signal.
 ## 7. Flow C — Escalation & control transfer
 
 The session is the shared state. Nothing is serialized or migrated; **only the lease moves.**
+
+Rendered: [`diagrams/escalation.lifecycle.png`](diagrams/escalation.lifecycle.png)
 
 ```mermaid
 stateDiagram-v2

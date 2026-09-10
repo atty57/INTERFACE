@@ -223,5 +223,5 @@ src/cua/
   mock_bank/  the target: frameset, table layout, no test IDs, ?fault= injection
 capabilities/ the committed artifact — this is what makes key-free replay work
 evidence/     one directory per run: steps.jsonl, masked screenshots, artifact
-docs/         spec.md (architecture), faults.md (every injectable condition)
+docs/         spec.md (architecture), faults.md (conditions), diagrams/ (rendered views)
 ```

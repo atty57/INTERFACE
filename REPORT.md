@@ -2,6 +2,8 @@
 
 ## 1. Architecture
 
+![Record once, replay forever](docs/diagrams/capability-lifecycle.workflow.png)
+
 The system splits **discovery** from **execution**. A model drives the application once; a
 typed artifact freezes what it learned; a deterministic executor replays it forever — with a
 policy gate under every action and a human lease that can take the wheel of the same live
@@ -96,6 +98,8 @@ it is tested directly against a fixed trace rather than only end to end.
 
 ## 3. Determinism & error handling
 
+![One invocation, three answers](docs/diagrams/replay.workflow.png)
+
 **Determinism is structural, not procedural.** The replay engine has no model client
 injected and none reachable by import. It runs with no API key present, and a test asserts
 that.
@@ -174,6 +178,8 @@ is what opens a fork review. A fork is a recorded decision, never automatic, bec
 alternative to reuse is re-recording twenty apps across hundreds of institutions.
 
 ## 5. Escalation & handoff
+
+![Escalation and control transfer](docs/diagrams/escalation.lifecycle.png)
 
 The no-progress detector earned its place during development rather than in theory: the
 first real run typed the user ID, clicked Sign On without the password, and looped. It fired

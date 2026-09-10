@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Escalation & Control Transfer",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      566
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Run state"
+    },
+    {
+      "id": "exits",
+      "label": "Terminal exits"
+    }
+  ],
+  "states": [
+    {
+      "id": "running",
+      "type": "start",
+      "label": "Running",
+      "sublabel": "lease = AUTOMATION",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "pausing",
+      "type": "active",
+      "label": "Pausing",
+      "sublabel": "stuck / failure",
+      "lane": "main",
+      "col": 1,
+      "step": "02"
+    },
+    {
+      "id": "awaiting",
+      "type": "waiting",
+      "label": "Awaiting Operator",
+      "sublabel": "lease = NONE",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "act() raises"
+    },
+    {
+      "id": "human",
+      "type": "active",
+      "label": "Human Control",
+      "sublabel": "lease = HUMAN",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "actions recorded"
+    },
+    {
+      "id": "resuming",
+      "type": "decision",
+      "label": "Resuming",
+      "sublabel": "re-anchor",
+      "lane": "main",
+      "col": 4,
+      "step": "05"
+    },
+    {
+      "id": "abandoned",
+      "type": "failure",
+      "label": "Abandoned",
+      "sublabel": "queue timeout",
+      "lane": "exits",
+      "col": 1
+    },
+    {
+      "id": "aborted",
+      "type": "failure",
+      "label": "Aborted",
+      "sublabel": "operator abort",
+      "lane": "exits",
+      "col": 2
+    },
+    {
+      "id": "succeeded",
+      "type": "success",
+      "label": "Success",
+      "sublabel": "or outcome",
+      "lane": "exits",
+      "col": 0
+    }
+  ],
+  "transitions": [
+    {
+      "id": "run-pause",
+      "from": "running",
+      "to": "pausing",
+      "label": "stuck / failure",
+      "variant": "security",
+      "labelDy": -28
+    },
+    {
+      "id": "pause-await",
+      "from": "pausing",
+      "to": "awaiting",
+      "label": "lease = NONE",
+      "variant": "security",
+      "labelDy": -28
+    },
+    {
+      "id": "await-human",
+      "from": "awaiting",
+      "to": "human",
+      "label": "claims",
+      "variant": "emphasis",
+      "labelDy": -28
+    },
+    {
+      "id": "await-abandon",
+      "from": "awaiting",
+      "to": "abandoned",
+      "label": "timeout",
+      "variant": "security",
+      "route": "drop"
+    },
+    {
+      "id": "human-resume",
+      "from": "human",
+      "to": "resuming",
+      "label": "Done",
+      "variant": "emphasis",
+      "labelDy": -28
+    },
+    {
+      "id": "human-abort",
+      "from": "human",
+      "to": "aborted",
+      "label": "Abort",
+      "variant": "security",
+      "route": "drop"
+    },
+    {
+      "id": "resume-running",
+      "from": "resuming",
+      "to": "running",
+      "label": "re-anchor ok",
+      "variant": "emphasis",
+      "route": "top-channel",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "resume-await",
+      "from": "resuming",
+      "to": "awaiting",
+      "label": "unknown screen",
+      "variant": "dashed",
+      "route": "top-channel",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "run-success",
+      "from": "running",
+      "to": "succeeded",
+      "label": "completes",
+      "variant": "emphasis",
+      "route": "drop",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Only the lease moves",
+      "items": [
+        "The session is never torn down, serialized, or migrated",
+        "While the request is open, nobody holds the lease"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Handback verifies",
+      "items": [
+        "Re-anchor runs before automation acts again",
+        "An unrecognised screen returns to the operator"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,251 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Deterministic Replay: One Invocation, Three Answers",
+    "locale": "en",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    {
+      "id": "caller",
+      "label": "Calling Agent"
+    },
+    {
+      "id": "engine",
+      "label": "Replay Engine — no model on this path"
+    },
+    {
+      "id": "safety",
+      "label": "Policy Gate"
+    },
+    {
+      "id": "human",
+      "label": "Recovery & Human Control",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "admit",
+      "label": "Admit",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "execute",
+      "label": "Authorize + act",
+      "fromCol": 1,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "classify",
+      "label": "Classify + answer",
+      "fromCol": 3,
+      "toCol": 4,
+      "variant": "dashed"
+    }
+  ],
+  "mainPath": [
+    "invoke",
+    "gate",
+    "act",
+    "race",
+    "success"
+  ],
+  "semanticChecks": {
+    "allowedRoots": [
+      "invoke"
+    ],
+    "allowedTerminals": [
+      "success",
+      "outcome",
+      "denied"
+    ],
+    "requiredPaths": [
+      {
+        "from": "invoke",
+        "to": "success"
+      },
+      {
+        "from": "race",
+        "to": "outcome"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "id": "invoke",
+      "lane": "caller",
+      "col": 0,
+      "type": "external",
+      "label": "agent.invoke()",
+      "sublabel": "typed arguments"
+    },
+    {
+      "id": "gate",
+      "lane": "safety",
+      "col": 1,
+      "type": "security",
+      "label": "Policy Gate",
+      "sublabel": "deny by default",
+      "tag": "inside act()"
+    },
+    {
+      "id": "denied",
+      "lane": "safety",
+      "col": 2,
+      "type": "security",
+      "label": "Refused",
+      "sublabel": "denied · escalated"
+    },
+    {
+      "id": "act",
+      "lane": "engine",
+      "col": 2,
+      "type": "backend",
+      "label": "Locate & act",
+      "sublabel": "tier ladder"
+    },
+    {
+      "id": "race",
+      "lane": "engine",
+      "col": 3,
+      "type": "backend",
+      "label": "Race detectors",
+      "sublabel": "one timeout"
+    },
+    {
+      "id": "outcome",
+      "lane": "caller",
+      "col": 3,
+      "type": "backend",
+      "label": "Business Outcome",
+      "sublabel": "not a crash",
+      "width": 118
+    },
+    {
+      "id": "success",
+      "lane": "caller",
+      "col": 4,
+      "type": "backend",
+      "label": "Success",
+      "sublabel": "typed outputs"
+    },
+    {
+      "id": "recover",
+      "lane": "human",
+      "col": 3,
+      "type": "messagebus",
+      "label": "Bounded Recovery",
+      "sublabel": "named · capped",
+      "width": 118
+    },
+    {
+      "id": "escalate",
+      "lane": "human",
+      "col": 4,
+      "type": "security",
+      "label": "Escalate",
+      "sublabel": "lease to a human"
+    }
+  ],
+  "edges": [
+    {
+      "id": "call-gate",
+      "from": "invoke",
+      "to": "gate",
+      "label": "arguments validated first",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate-act",
+      "from": "gate",
+      "to": "act",
+      "label": "allowed",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate-denied",
+      "from": "gate",
+      "to": "denied",
+      "label": "off-allowlist",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "act-race",
+      "from": "act",
+      "to": "race",
+      "variant": "emphasis"
+    },
+    {
+      "id": "race-success",
+      "from": "race",
+      "to": "success",
+      "label": "checkpoint",
+      "variant": "emphasis"
+    },
+    {
+      "id": "race-outcome",
+      "from": "race",
+      "to": "outcome",
+      "label": "known outcome",
+      "variant": "default",
+      "role": "branch"
+    },
+    {
+      "id": "race-recover",
+      "from": "race",
+      "to": "recover",
+      "label": "recoverable",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "recover-retry",
+      "from": "recover",
+      "to": "act",
+      "label": "retry the step",
+      "variant": "dashed",
+      "role": "return"
+    },
+    {
+      "id": "recover-escalate",
+      "from": "recover",
+      "to": "escalate",
+      "label": "attempts exhausted",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "escalate-resume",
+      "from": "escalate",
+      "to": "act",
+      "label": "re-anchor, resume",
+      "variant": "dashed",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Why this is deterministic",
+      "items": [
+        "No model client is reachable from the replay import graph",
+        "Waiting is on expected state, never a fixed duration",
+        "The first tier matching exactly one control wins"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Fail closed",
+      "items": [
+        "Reversibility comes from the control, not the file",
+        "Two detectors matching at once is a hard failure, never a guess",
+        "Irreversible actions escalate to a human instead of proceeding"
+      ]
+    }
+  ]
+}
