@@ -52,11 +52,17 @@ def record(
     evidence_root: Path | str = "evidence",
     store_root: Path | str = "capabilities",
     secret_handles: list[str] | None = None,
+    evidence: EvidenceBus | None = None,
 ) -> RecordingResult:
     run_id = f"discovery-{dt.datetime.now(dt.UTC).strftime('%Y%m%d-%H%M%S')}"
     secrets = SecretResolver(secret_handles or DEFAULT_SECRET_HANDLES)
     secrets.check_available()
-    evidence = EvidenceBus(run_id, root=evidence_root, redactor=Redactor(secrets.values()))
+    # As in replay: a caller may own the bus so it can watch the run as it happens.
+    if evidence is None:
+        evidence = EvidenceBus(run_id, root=evidence_root, redactor=Redactor(secrets.values()))
+    else:
+        evidence.redactor.values.update(secrets.values())
+        run_id = evidence.run_id
 
     host = urlparse(target).hostname or "localhost"
     policy = Policy(allowlisted_domains=[host])

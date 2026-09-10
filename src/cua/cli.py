@@ -78,6 +78,29 @@ def _replay(args: argparse.Namespace) -> int:
     return 0 if result.kind != "failure" else 2
 
 
+def _studio(args: argparse.Namespace) -> int:
+    """Everything a reviewer needs on one page: the mock app, the studio, one URL."""
+    import threading
+
+    import uvicorn
+
+    from .mock_bank.app import app as mock_app
+    from .studio.app import build
+    from .studio.runner import RunManager
+
+    bank = uvicorn.Server(
+        uvicorn.Config(mock_app, host="127.0.0.1", port=args.app_port, log_level="error")
+    )
+    threading.Thread(target=bank.run, daemon=True).start()
+
+    manager = RunManager(evidence_root=args.evidence_root, headless=args.headless)
+    print(f"target application : http://127.0.0.1:{args.app_port}", file=sys.stderr)
+    print(f"studio             : http://127.0.0.1:{args.port}", file=sys.stderr)
+    uvicorn.run(build(manager, args.store_root), host="127.0.0.1", port=args.port,
+                log_level="warning")
+    return 0
+
+
 def _catalog(args: argparse.Namespace) -> int:
     from .artifact.store import ArtifactStore
     from .catalog.registry import CapabilityCatalog
@@ -133,6 +156,20 @@ def build_parser() -> argparse.ArgumentParser:
     rep.add_argument("--escalation-timeout", type=float, default=120.0)
     rep.add_argument("--headful", action="store_true")
     rep.set_defaults(func=_replay)
+
+    studio = sub.add_parser(
+        "studio", help="start the target app and the studio, and print both URLs"
+    )
+    studio.add_argument("--port", type=int, default=8900)
+    studio.add_argument("--app-port", type=int, default=8000)
+    studio.add_argument("--store-root", default="capabilities")
+    studio.add_argument("--evidence-root", default="evidence")
+    studio.add_argument(
+        "--headless",
+        action="store_true",
+        help="hide the browser; by default it is visible, which is how a human takes over",
+    )
+    studio.set_defaults(func=_studio)
 
     cat = sub.add_parser("catalog", help="list approved capabilities as tool definitions")
     cat.add_argument("--store-root", default="capabilities")

@@ -47,6 +47,32 @@ replay works anyway.
 
 ## Demo path
 
+### The short version: one command
+
+```bash
+python -m cua studio
+# target application : http://127.0.0.1:8000
+# studio             : http://127.0.0.1:8900
+```
+
+Open the studio. Type a goal and a URL to run the agent, or pick a saved capability and
+invoke it with typed arguments — the input form is generated from the capability's own JSON
+Schema, so `member_id` arrives with its `^\d{3,9}$` pattern already on it. You watch the
+agent's actions arrive as it works, each with the policy verdict and the locator tier that
+resolved it; when it stops, the intervention panel appears with Claim / Done / Abort.
+
+The live screen is the Chrome window the agent drives, which opens on your desktop. It is
+not streamed into the page, because after **Claim** you drive *that window* — the same
+session, with its cookies and half-filled forms intact. A streamed copy could only be
+watched.
+
+Runs execute one at a time. There is one browser and one control lease; that is the model,
+not a queue limitation.
+
+The rest of this section is the same work through the CLI, which is what the studio calls.
+
+### The long version: one command per step
+
 Start the target application in one terminal and leave it running:
 
 ```bash
@@ -185,6 +211,7 @@ against a frameset, which is the whole thesis. Faults come from the mock applica
 
 ```
 src/cua/
+  studio/     the one-page operator surface: state a goal, watch, take over
   surface/    the load-bearing seam: snapshot / locate / act  (web driver + desktop stub)
   artifact/   the capability artifact: Pydantic model, store, JSON-Schema export
   discover/   the LLM loop, prompts, stuck detection, recorder, generalization pass

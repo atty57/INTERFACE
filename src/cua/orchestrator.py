@@ -119,10 +119,13 @@ def replay(
     evidence_root: Path | str = "evidence",
     escalation: EscalationBroker | None = None,
     label: str = "",
+    evidence: EvidenceBus | None = None,
 ) -> RunResult:
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%d-%H%M%S")
     run_id = f"replay-{label}-{stamp}" if label else f"replay-{stamp}"
-    evidence = EvidenceBus(run_id, root=evidence_root, redactor=Redactor())
+    # A caller may supply the bus so it knows where the evidence is while the run is still
+    # going, rather than only once it has finished.
+    evidence = evidence or EvidenceBus(run_id, root=evidence_root, redactor=Redactor())
 
     try:
         artifact = ArtifactStore(store_root).load(capability_id, version)

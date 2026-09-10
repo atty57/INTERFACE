@@ -10,6 +10,8 @@ event capture, and the re-anchor below are what a production console would drive
 
 from __future__ import annotations
 
+import queue
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -73,6 +75,10 @@ class EscalationBroker:
         self._step: Step | None = None
         self._params: dict[str, Any] = {}
         self._recorder: HumanActivityRecorder | None = None
+        self._owner_thread: int | None = None
+        self._pending: queue.Queue[tuple[str, str, threading.Event, dict[str, Any]]] = (
+            queue.Queue()
+        )
 
     def bind_evidence(self, evidence: EvidenceBus) -> None:
         """Write into the run's own evidence directory, not a directory of our own."""
@@ -104,6 +110,8 @@ class EscalationBroker:
     ) -> str | None:
         self._artifact, self._step = artifact, step
         self._params = params or {}
+        # From here until the request resolves, this is the thread that owns the session.
+        self._owner_thread = threading.get_ident()
         shot = self.evidence.screenshot(self._session.page, f"escalation-{step.id}")
         request = InterventionRequest(
             capability_id=artifact.capability_id,
@@ -137,6 +145,38 @@ class EscalationBroker:
         return next((r for r in self.queue if r.id == request_id), None)
 
     def claim(self, request_id: str) -> InterventionRequest | None:
+        return self._dispatch("claim", request_id)
+
+    def done(self, request_id: str) -> str | None:
+        return self._dispatch("done", request_id)
+
+    def abort(self, request_id: str) -> str | None:
+        return self._dispatch("abort", request_id)
+
+    def _dispatch(self, verb: str, request_id: str) -> Any:
+        """Run the verb on the session's own thread, whoever asked for it.
+
+        Playwright's sync API belongs to the thread that created the session, and every one
+        of these verbs touches the page — the lease recorder installs listeners, and the
+        re-anchor evaluates checkpoints against the live screen. Called from an HTTP handler
+        on another thread, they used to raise, or worse, fail silently and report that the
+        screen could not be recognised when nothing had actually looked at it.
+        """
+        if self._owner_thread in (None, threading.get_ident()):
+            return self._perform(verb, request_id)
+        finished = threading.Event()
+        box: dict[str, Any] = {}
+        self._pending.put((verb, request_id, finished, box))
+        if not finished.wait(timeout=self.wait_timeout_s):
+            return None
+        return box.get("result")
+
+    def _perform(self, verb: str, request_id: str) -> Any:
+        return {"claim": self._claim, "done": self._done, "abort": self._abort}[verb](
+            request_id
+        )
+
+    def _claim(self, request_id: str) -> InterventionRequest | None:
         request = self.find(request_id)
         if request is None or request.state not in ("open", "claimed"):
             return None
@@ -147,7 +187,7 @@ class EscalationBroker:
         self.evidence.log("lease_claimed", request=request.id, holder="human")
         return request
 
-    def done(self, request_id: str) -> str | None:
+    def _done(self, request_id: str) -> str | None:
         """Handback: re-anchor before acting. Never resume blindly on an unknown screen."""
         request = self.find(request_id)
         if request is None:
@@ -170,7 +210,7 @@ class EscalationBroker:
         )
         return anchor
 
-    def abort(self, request_id: str) -> str | None:
+    def _abort(self, request_id: str) -> str | None:
         request = self.find(request_id)
         if request is None:
             return None
@@ -185,6 +225,15 @@ class EscalationBroker:
     def _await_operator(self, request: InterventionRequest) -> str | None:
         deadline = time.monotonic() + self.wait_timeout_s
         while time.monotonic() < deadline:
+            try:
+                verb, request_id, finished, box = self._pending.get_nowait()
+            except queue.Empty:
+                pass
+            else:
+                try:
+                    box["result"] = self._perform(verb, request_id)
+                finally:
+                    finished.set()
             if request.state == "resolved":
                 return request.resolution
             if request.state == "aborted":

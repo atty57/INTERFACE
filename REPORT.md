@@ -218,6 +218,16 @@ step's (they restored the starting state → perform the action again). If neith
 request goes back to the operator rather than acting on a screen it cannot place. Abort ends
 the run as `operator_aborted`; an unclaimed queue times out as `escalation_timeout`.
 
+`cua studio` puts the same mechanism behind one page: a goal and a URL start a discovery
+run, a saved capability is invoked through a form generated from its own JSON Schema, the
+action trail streams in as the agent works, and the intervention panel offers the three
+verbs. It is a thin layer — it calls the same functions the CLI does and reads the same
+evidence — and it exists because a reviewer should not need two terminals to see the thesis.
+Building it surfaced a defect worth naming: every one of those verbs touches the live page,
+and driving them from an HTTP thread while the session belongs to a worker thread made
+`claim` raise and made re-anchor report "screen not recognised" without ever looking. The
+verbs are now confined to the thread that owns the session, whoever asks for them.
+
 The console is a mock surface over a real mechanism — the lease transitions, the event
 capture and the re-anchor are what a production console would drive, unchanged. A
 compounding benefit of capturing human actions: repeated intervention at the same step is
