@@ -9,17 +9,7 @@ typed artifact freezes what it learned; a deterministic executor replays it fore
 policy gate under every action and a human lease that can take the wheel of the same live
 session.
 
-```
-callers ──▶ Catalog ──▶ Orchestrator ──▶ ┌ Discovery engine (LLM) ──▶ Recorder ─┐
-                             │           └ Replay engine (NO LLM) ◀── artifact ◀┘
-                             │                      │
-                   ══════ POLICY GATE ══════════════╪══════ (inside Surface.act)
-                                                    ▼
-                            Surface: snapshot() · locate() · act()
-                              WebSurface (built) · DesktopSurface (stub)
-                                                    ▼
-                      Session broker: headful Chrome + CDP + ControlLease
-```
+![Three planes, one seam](docs/diagrams/system.architecture.png)
 
 Three invariants hold it together, each with a test that fails if violated:
 

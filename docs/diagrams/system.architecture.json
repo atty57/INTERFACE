@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Three Planes, One Seam",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1080,
+      566
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      48,
+      92
+    ],
+    "cols": 3,
+    "cellW": 150,
+    "cellH": 52,
+    "gapX": 180,
+    "gapY": 36
+  },
+  "components": [
+    {
+      "id": "agent",
+      "type": "external",
+      "label": "AI Agent",
+      "sublabel": "calls by name",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "Catalog",
+      "sublabel": "name to artifact",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "orchestrator",
+      "type": "backend",
+      "label": "Orchestrator",
+      "sublabel": "run lifecycle",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "store",
+      "type": "database",
+      "label": "Artifact Store",
+      "sublabel": "git-tracked",
+      "row": 2,
+      "col": 1
+    },
+    {
+      "id": "evidence",
+      "type": "database",
+      "label": "Evidence Bus",
+      "sublabel": "redacted",
+      "row": 3,
+      "col": 2
+    },
+    {
+      "id": "discovery",
+      "type": "backend",
+      "label": "Discovery",
+      "sublabel": "model in the loop",
+      "row": 2,
+      "col": 0
+    },
+    {
+      "id": "replay",
+      "type": "backend",
+      "label": "Replay",
+      "sublabel": "no model",
+      "row": 2,
+      "col": 2,
+      "tag": "production path"
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Policy Gate",
+      "sublabel": "deny by default",
+      "row": 3,
+      "col": 1,
+      "tag": "inside act()"
+    },
+    {
+      "id": "surface",
+      "type": "frontend",
+      "label": "WebSurface",
+      "sublabel": "digest · frames",
+      "row": 4,
+      "col": 0
+    },
+    {
+      "id": "desktop",
+      "type": "frontend",
+      "label": "DesktopSurface",
+      "sublabel": "stub",
+      "row": 3,
+      "col": 0
+    },
+    {
+      "id": "session",
+      "type": "backend",
+      "label": "Session Broker",
+      "sublabel": "CDP · lease",
+      "row": 4,
+      "col": 1
+    },
+    {
+      "id": "app",
+      "type": "cloud",
+      "label": "Core Banking App",
+      "sublabel": "frameset, no test IDs",
+      "row": 4,
+      "col": 2
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Below the model — every action passes here",
+      "wraps": [
+        "gate"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "agent-catalog",
+      "from": "agent",
+      "to": "catalog",
+      "variant": "emphasis"
+    },
+    {
+      "id": "catalog-orch",
+      "from": "catalog",
+      "to": "orchestrator",
+      "label": "resolve + validate",
+      "labelDy": -27
+    },
+    {
+      "id": "orch-discovery",
+      "from": "orchestrator",
+      "to": "discovery",
+      "label": "record"
+    },
+    {
+      "id": "orch-replay",
+      "from": "orchestrator",
+      "to": "replay",
+      "label": "invoke"
+    },
+    {
+      "id": "discovery-store",
+      "from": "discovery",
+      "to": "store",
+      "label": "artifact (draft)",
+      "variant": "dashed",
+      "labelDy": 12
+    },
+    {
+      "id": "store-replay",
+      "from": "store",
+      "to": "replay",
+      "label": "approved only",
+      "variant": "emphasis",
+      "labelDy": 12
+    },
+    {
+      "id": "discovery-gate",
+      "from": "discovery",
+      "to": "gate",
+      "label": "every action",
+      "variant": "security"
+    },
+    {
+      "id": "replay-gate",
+      "from": "replay",
+      "to": "gate",
+      "label": "every action",
+      "variant": "security"
+    },
+    {
+      "id": "gate-surface",
+      "from": "gate",
+      "to": "surface",
+      "label": "authorized act",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gate-desktop",
+      "from": "gate",
+      "to": "desktop",
+      "label": "same protocol",
+      "variant": "dashed",
+      "labelDy": 12
+    },
+    {
+      "id": "gate-evidence",
+      "from": "gate",
+      "to": "evidence",
+      "label": "every decision",
+      "variant": "dashed",
+      "labelDy": 22
+    },
+    {
+      "id": "surface-session",
+      "from": "surface",
+      "to": "session",
+      "label": "page + lease",
+      "labelDy": 24
+    },
+    {
+      "id": "session-app",
+      "from": "session",
+      "to": "app",
+      "label": "headful Chrome",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The gate sits below the model",
+      "items": [
+        "Both engines reach the surface only through Policy Gate",
+        "A jailbroken model still cannot act outside the allowlist"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The session sits below the engines",
+      "items": [
+        "Adding a surface means three methods and nothing else",
+        "A human can take over the live run because nothing is torn down"
+      ]
+    }
+  ]
+}
