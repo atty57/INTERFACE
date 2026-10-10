@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 
 from conftest import CAPABILITY
+from cua.artifact.models import InputParam
 from cua.artifact.store import ArtifactStore
 from cua.orchestrator import execute, replay, validate_params
 
@@ -87,6 +88,26 @@ def test_an_unknown_parameter_is_rejected(committed_artifact):
     assert "unknown parameter 'sort_code'" in validate_params(
         committed_artifact, {"member_id": "12345", "sort_code": "00"}
     )
+
+
+def test_an_integer_param_rejects_bool_and_non_integral_float(committed_artifact):
+    """bool is an int subclass and 1.5 is not integral — a trust-boundary check (#20)."""
+    art = committed_artifact.model_copy(
+        update={"input_params": [InputParam(name="count", type="integer")]}
+    )
+    assert validate_params(art, {"count": True}) == ["'count' must be a integer"]
+    assert validate_params(art, {"count": 1.5}) == ["'count' must be a integer"]
+    assert validate_params(art, {"count": 3}) == []
+    assert validate_params(art, {"count": 3.0}) == []
+
+
+def test_latest_version_prefers_a_release_over_its_own_pre_release(tmp_path, committed_artifact):
+    """load() with no pinned version must pick "1.0.0" over "1.0.0-rc1", as SemVer requires (#18)."""
+    store = ArtifactStore(tmp_path / "capabilities")
+    store.save(committed_artifact.model_copy(update={"version": "1.0.0-rc1"}))
+    store.save(committed_artifact.model_copy(update={"version": "1.0.0"}))
+    assert store.versions(CAPABILITY)[-1] == "1.0.0"
+    assert store.load(CAPABILITY).version == "1.0.0"
 
 
 def test_invalid_input_is_refused_without_opening_a_browser(tmp_path, base_url):
