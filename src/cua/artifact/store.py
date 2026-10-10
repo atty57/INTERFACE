@@ -20,14 +20,15 @@ class ArtifactNotFound(Exception):
     pass
 
 
-def _semver_key(version: str) -> tuple[tuple[int, ...], str]:
+def _semver_key(version: str) -> tuple[tuple[int, ...], int, str]:
     head, _, tail = version.partition("-")
     try:
         numbers = tuple(int(part) for part in head.split("."))
     except ValueError:
-        return ((), version)
-    # A pre-release suffix sorts below the plain release, as SemVer requires.
-    return (numbers, "" if not tail else f" {tail}")
+        return ((), 0, version)
+    # A pre-release sorts below the plain release with the same numbers, as SemVer requires:
+    # the release gets the higher secondary rank, so "1.0.0" sorts above "1.0.0-rc1".
+    return (numbers, 0, tail) if tail else (numbers, 1, "")
 
 
 class ArtifactStore:

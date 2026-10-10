@@ -38,9 +38,13 @@ def validate_params(artifact: CapabilityArtifact, params: dict[str, Any]) -> lis
                 problems.append(f"missing required parameter '{param.name}'")
             continue
         value = params[param.name]
-        if param.type in ("integer", "number") and not isinstance(value, (int, float)):
-            problems.append(f"'{param.name}' must be a {param.type}")
-            continue
+        if param.type in ("integer", "number"):
+            # bool is an int subclass, so guard it out before the numeric check.
+            numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
+            integral = numeric and float(value).is_integer()
+            if not numeric or (param.type == "integer" and not integral):
+                problems.append(f"'{param.name}' must be a {param.type}")
+                continue
         if param.type == "boolean" and not isinstance(value, bool):
             problems.append(f"'{param.name}' must be a boolean")
             continue
